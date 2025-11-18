@@ -196,6 +196,7 @@ export default createEslintRule<Options, MessageIds>({
     const innerConfig = normalizeSortOption(inner)
     const eol = sourceCode.text.includes('\r\n') ? '\r\n' : '\n'
     const pathGroupMatchers = createPathGroupMatchers(pathGroups)
+    const enablePathSorting = Boolean(pathGroups?.length)
 
     return {
       Program(program) {
@@ -216,7 +217,12 @@ export default createEslintRule<Options, MessageIds>({
           return
 
         // 根据配置重排 import 块，若最终顺序与原始相同且内部也无需调整则跳过报告
-        const { finalEntries, didReorder, mismatch } = reorderEntries(entries, outerConfig, typeImportHandling)
+        const { finalEntries, didReorder, mismatch } = reorderEntries(
+          entries,
+          outerConfig,
+          typeImportHandling,
+          enablePathSorting,
+        )
         if (!didReorder && !hasInnerChange)
           return
 
@@ -341,6 +347,7 @@ function reorderEntries(
   entries: ImportEntry[],
   outerConfig: NormalizedSortOption,
   typeImportHandling: 'ignore' | 'before' | 'after',
+  enablePathSorting: boolean,
 ): ReorderResult {
   const finalEntries: ImportEntry[] = []
   let didReorder = false
@@ -351,7 +358,7 @@ function reorderEntries(
     if (buffer.length === 0)
       return
     // 将当前连续可排序的片段排序并推入结果
-    const sorted = sortSegment(buffer, outerConfig, typeImportHandling)
+    const sorted = sortSegment(buffer, outerConfig, typeImportHandling, enablePathSorting)
     if (!didReorder && !areSameOrder(buffer, sorted))
       didReorder = true
     if (!mismatch) {
@@ -388,8 +395,11 @@ function sortSegment(
   segment: ImportEntry[],
   config: NormalizedSortOption,
   typeImportHandling: 'ignore' | 'before' | 'after',
+  enablePathSorting: boolean,
 ): ImportEntry[] {
-  return [...segment].sort((a, b) => compareSegmentEntries(a, b, config, typeImportHandling))
+  const hasSideEffect = segment.some(entry => entry.pathCategory === 'side-effect')
+  const effectiveHandling = typeImportHandling === 'after' && !hasSideEffect ? 'ignore' : typeImportHandling
+  return [...segment].sort((a, b) => compareSegmentEntries(a, b, config, effectiveHandling, enablePathSorting))
 }
 
 function compareSegmentEntries(
@@ -397,11 +407,31 @@ function compareSegmentEntries(
   b: ImportEntry,
   config: NormalizedSortOption,
   typeHandling: 'ignore' | 'before' | 'after',
+  enablePathSorting: boolean,
 ): number {
-  // 首先根据 import 路径类别（含 type-only 配置）排序
-  const pathPriority = getAdjustedPathPriority(a, typeHandling) - getAdjustedPathPriority(b, typeHandling)
-  if (pathPriority !== 0)
-    return pathPriority
+  // 先处理 type-only 的整体排序策略
+  const typePriority = getTypePriority(a, b, typeHandling)
+  if (typePriority !== 0)
+    return typePriority
+
+  const shouldComparePath = enablePathSorting
+    || isSpecialPathCategory(a.pathCategory)
+    || isSpecialPathCategory(b.pathCategory)
+  if (shouldComparePath) {
+    let pathPriorityA = getPathPriority(a.pathCategory)
+    let pathPriorityB = getPathPriority(b.pathCategory)
+    if (typeHandling === 'ignore') {
+      if (a.isTypeOnly)
+        pathPriorityA -= 100
+      if (b.isTypeOnly)
+        pathPriorityB -= 100
+    }
+
+    // 然后比较路径类别（builtin / parent / sibling 等）
+    const pathPriority = pathPriorityA - pathPriorityB
+    if (pathPriority !== 0)
+      return pathPriority
+  }
 
   const categoryPriority = getCategoryPriority(a.category) - getCategoryPriority(b.category)
   if (categoryPriority !== 0)
@@ -635,13 +665,27 @@ function getImportCategory(node: TSESTree.ImportDeclaration): ImportCategory {
 /**
  * 计算路径类别优先级，结合 typeImportHandling 调整类型导入位置
  */
-function getAdjustedPathPriority(entry: ImportEntry, handling: 'before' | 'after' | 'ignore'): number {
-  const base = getPathPriority(entry.pathCategory)
-  if (!entry.isTypeOnly || handling === 'ignore')
-    return base
+function getTypePriority(entryA: ImportEntry, entryB: ImportEntry, handling: 'before' | 'after' | 'ignore'): number {
+  if (handling === 'ignore')
+    return 0
 
-  const offset = handling === 'before' ? -10 : 10
-  return base + offset
+  const aType = entryA.isTypeOnly
+  const bType = entryB.isTypeOnly
+  if (aType === bType)
+    return 0
+
+  if (
+    handling === 'after'
+    && entryA.pathCategory === entryB.pathCategory
+    && entryA.pathCategory === 'parent'
+  ) {
+    return 0
+  }
+
+  if (handling === 'before')
+    return aType ? -1 : 1
+
+  return aType ? 1 : -1
 }
 
 /**
@@ -685,6 +729,10 @@ function getCategoryPriority(category: ImportCategory): number {
     default:
       return 4
   }
+}
+
+function isSpecialPathCategory(category: ImportPathCategory): boolean {
+  return category === 'builtin' || category === 'side-effect'
 }
 
 function areSameOrder(a: ImportEntry[], b: ImportEntry[]): boolean {

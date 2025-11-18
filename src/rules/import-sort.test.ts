@@ -69,6 +69,19 @@ const valids: ValidTestCase[] = [
       },
     ],
   },
+  // 组合：显式要求副作用导入也参与排序，当前顺序应视为合法
+  {
+    code: $`
+      import { alpha } from './alpha'
+      import './polyfill.css'
+      import './reset.css'
+    `,
+    options: [
+      {
+        ignoreSideEffectImports: false,
+      },
+    ],
+  },
 ]
 
 const invalid: InvalidTestCase[] = [
@@ -96,6 +109,45 @@ const invalid: InvalidTestCase[] = [
       console.log(foo, bar)
 
       export const value = bar + alpha.length"
+    `),
+  },
+  // 组合：命名、默认与 namespace 导入需要按类别优先级排序
+  {
+    code: $`
+      import * as api from './api'
+      import foo from './foo'
+      import { bar } from './bar'
+    `,
+    output: output => expect(output).toMatchInlineSnapshot(`
+      "import { bar } from './bar'
+      import foo from './foo'
+      import * as api from './api'"
+    `),
+  },
+  // 组合：命名导入在忽略大小写的前提下需要按字母顺序重排
+  {
+    code: $`
+      import {
+        zebra,
+        Alpha,
+        beta,
+      } from './foo'
+    `,
+    options: [
+      {
+        inner: {
+          enableLength: false,
+          enableAlphabet: true,
+          caseSensitive: false,
+        },
+      },
+    ],
+    output: output => expect(output).toMatchInlineSnapshot(`
+      "import {
+        Alpha,
+        beta,
+        zebra,
+      } from './foo'"
     `),
   },
   {
@@ -140,6 +192,24 @@ const invalid: InvalidTestCase[] = [
       export function useList() {
         return [Z, a, alpha]
       }"
+    `),
+  },
+  // 组合：启用副作用导入排序时，副作用语句需整体位于普通导入之后
+  {
+    code: $`
+      import './polyfill.css'
+      import { alpha } from './alpha'
+      import './reset.css'
+    `,
+    options: [
+      {
+        ignoreSideEffectImports: false,
+      },
+    ],
+    output: output => expect(output).toMatchInlineSnapshot(`
+      "import { alpha } from './alpha'
+      import './polyfill.css'
+      import './reset.css'"
     `),
   },
   {
@@ -270,6 +340,33 @@ const invalid: InvalidTestCase[] = [
       import { foo } from '@/foo'"
     `),
   },
+  // 组合：多条 pathGroups 配置下，命中规则的导入需要比外部模块更靠前
+  {
+    code: $`
+      import axios from 'axios'
+      import { Button } from '~/components/button'
+      import { coreUtil } from '@core/utils'
+    `,
+    options: [
+      {
+        pathGroups: [
+          {
+            pattern: '^@core/',
+            group: 'parent',
+          },
+          {
+            pattern: '^~/',
+            group: 'sibling',
+          },
+        ],
+      },
+    ],
+    output: output => expect(output).toMatchInlineSnapshot(`
+      "import { coreUtil } from '@core/utils'
+      import { Button } from '~/components/button'
+      import axios from 'axios'"
+    `),
+  },
   {
     code: $`
       import { fonds } from '../src/factory'
@@ -302,6 +399,22 @@ const invalid: InvalidTestCase[] = [
       import type { Bar } from './types/bar'
       import { bar } from './bar'
       import baz from './baz'"
+    `),
+  },
+  // 组合：typeImportHandling 为 ignore 时，类型导入需要自动提前
+  {
+    code: $`
+      import fs from 'node:fs'
+      import type { EnvConfig } from './types'
+    `,
+    options: [
+      {
+        typeImportHandling: 'ignore',
+      },
+    ],
+    output: output => expect(output).toMatchInlineSnapshot(`
+      "import type { EnvConfig } from './types'
+      import fs from 'node:fs'"
     `),
   },
   {
@@ -344,6 +457,26 @@ const invalid: InvalidTestCase[] = [
       import { fonds } from '../src/factory'
       import { builtinRules } from 'eslint/use-at-your-own-risk'
       import { flatConfigsToRulesDTS } from 'eslint-typegen/core'"
+    `),
+  },
+  {
+    code: $`
+      import type { OptionsFiles, OptionsOverrides, TypedFlatConfigItem, OptionsComponentExts } from '../types'
+      import { parserPlain, interopDefault } from '../utils'
+      import { GLOB_MARKDOWN, GLOB_MARKDOWN_CODE, GLOB_MARKDOWN_IN_MARKDOWN } from '../globs'
+      import { mergeProcessors, processorPassThrough } from 'eslint-merge-processors'
+    `,
+    options: [
+      {
+        typeImportHandling: 'after',
+        ignoreSideEffectImports: false,
+      },
+    ],
+    output: output => expect(output).toMatchInlineSnapshot(`
+      "import { parserPlain, interopDefault } from '../utils'
+      import { mergeProcessors, processorPassThrough } from 'eslint-merge-processors'
+      import { GLOB_MARKDOWN, GLOB_MARKDOWN_CODE, GLOB_MARKDOWN_IN_MARKDOWN } from '../globs'
+      import type { OptionsFiles, OptionsOverrides, TypedFlatConfigItem, OptionsComponentExts } from '../types'"
     `),
   },
 ]
