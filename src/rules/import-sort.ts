@@ -22,6 +22,10 @@ export type Options = [
     inner?: SortOption
     ignoreSideEffectImports?: boolean
     typeImportHandling?: 'ignore' | 'before' | 'after'
+    pathGroups?: Array<{
+      pattern: string
+      group: ImportPathCategory
+    }>
   },
 ]
 
@@ -42,9 +46,11 @@ interface ImportEntry {
   category: ImportCategory
   isTypeOnly: boolean
   sourceValue: string
+  pathCategory: ImportPathCategory
 }
 
 type ImportCategory = 'named' | 'default' | 'namespace' | 'side-effect'
+type ImportPathCategory = 'builtin' | 'absolute' | 'parent' | 'sibling' | 'index' | 'external' | 'unknown' | 'side-effect'
 interface ReorderResult {
   finalEntries: ImportEntry[]
   didReorder: boolean
@@ -54,6 +60,11 @@ interface ReorderResult {
 interface MismatchInfo {
   expected: ImportEntry
   actual: ImportEntry
+}
+
+interface PathGroupMatcher {
+  regex: RegExp
+  group: ImportPathCategory
 }
 
 export default createEslintRule<Options, MessageIds>({
@@ -78,6 +89,25 @@ export default createEslintRule<Options, MessageIds>({
             enum: ['ignore', 'before', 'after'],
             default: 'before',
             description: 'Decide how `import type` declarations participate in sorting',
+          },
+          pathGroups: {
+            type: 'array',
+            description: 'Custom path grouping rules to override default path category detection',
+            items: {
+              type: 'object',
+              properties: {
+                pattern: {
+                  type: 'string',
+                  description: 'JavaScript RegExp pattern used to match import sources',
+                },
+                group: {
+                  type: 'string',
+                  enum: ['builtin', 'absolute', 'parent', 'sibling', 'index', 'external', 'unknown', 'side-effect'],
+                },
+              },
+              required: ['pattern', 'group'],
+              additionalProperties: false,
+            },
           },
           outer: {
             type: 'object',
@@ -144,6 +174,7 @@ export default createEslintRule<Options, MessageIds>({
       },
       ignoreSideEffectImports: true,
       typeImportHandling: 'before',
+      pathGroups: [],
     },
   ],
   /**
@@ -158,22 +189,33 @@ export default createEslintRule<Options, MessageIds>({
       inner,
       ignoreSideEffectImports = true,
       typeImportHandling = 'before',
+      pathGroups = [],
     } = option ?? {}
 
     const outerConfig = normalizeSortOption(outer)
     const innerConfig = normalizeSortOption(inner)
     const eol = sourceCode.text.includes('\r\n') ? '\r\n' : '\n'
+    const pathGroupMatchers = createPathGroupMatchers(pathGroups)
 
     return {
       Program(program) {
+        // 仅处理位于文件起始处的连续 import 声明块
         const importNodes = collectTopImportDeclarations(program)
         if (importNodes.length === 0)
           return
 
-        const { entries, hasInnerChange } = buildEntries(importNodes, sourceCode, innerConfig, ignoreSideEffectImports)
+        // 构建排序条目，并检查命名导入是否需要内部排序
+        const { entries, hasInnerChange } = buildEntries(
+          importNodes,
+          sourceCode,
+          innerConfig,
+          ignoreSideEffectImports,
+          pathGroupMatchers,
+        )
         if (entries.length <= 1 && !hasInnerChange)
           return
 
+        // 根据配置重排 import 块，若最终顺序与原始相同且内部也无需调整则跳过报告
         const { finalEntries, didReorder, mismatch } = reorderEntries(entries, outerConfig, typeImportHandling)
         if (!didReorder && !hasInnerChange)
           return
@@ -181,6 +223,7 @@ export default createEslintRule<Options, MessageIds>({
         const blockStart = importNodes[0].range[0]
         const blockEnd = importNodes[importNodes.length - 1].range[1]
         const replacement = rebuildBlock(finalEntries, eol)
+        // 若存在首个冲突，则输出详细错误信息以指明具体导入
         const messageId: MessageIds = mismatch ? 'importSortDetailed' : 'importSort'
         const data = mismatch
           ? {
@@ -208,11 +251,16 @@ export default createEslintRule<Options, MessageIds>({
   },
 })
 
+/**
+ * 收集文件顶部连续的 import 声明
+ * @description 跳过 `'use strict'` 等指令，遇到首个非 import 语句立即停止
+ */
 function collectTopImportDeclarations(program: TSESTree.Program): TSESTree.ImportDeclaration[] {
   const imports: TSESTree.ImportDeclaration[] = []
   const body = program.body
   let index = 0
 
+  // 跳过 "use strict" 等指令语句
   while (index < body.length) {
     const statement = body[index]
     if (isDirective(statement)) {
@@ -224,6 +272,7 @@ function collectTopImportDeclarations(program: TSESTree.Program): TSESTree.Impor
     return imports
   }
 
+  // 自首个 import 起连续收集，遇到其他语句立即停止
   while (index < body.length) {
     const statement = body[index]
     if (statement.type !== 'ImportDeclaration')
@@ -239,22 +288,29 @@ function isDirective(statement: TSESTree.Statement): statement is TSESTree.Expre
   return statement.type === 'ExpressionStatement' && typeof statement.directive === 'string'
 }
 
+/**
+ * 构建排序用的 ImportEntry 数组
+ * @description 同时判断命名导入是否需要重新排序，收集 leading 文本以便重建
+ */
 function buildEntries(
   nodes: TSESTree.ImportDeclaration[],
   sourceCode: TSESLint.SourceCode,
   innerConfig: NormalizedSortOption,
   ignoreSideEffectImports: boolean,
+  pathGroupMatchers: PathGroupMatcher[],
 ): { entries: ImportEntry[], hasInnerChange: boolean } {
   const entries: ImportEntry[] = []
   let hasInnerChange = false
   let previousEnd = nodes[0].range[0]
 
   nodes.forEach((node, index) => {
+    // 记录 import 前方的空白/注释，以便重建时保留
     const leadingText = sourceCode.text.slice(previousEnd, node.range[0])
     const { text, changed } = normalizeImportText(node, sourceCode, innerConfig)
     if (changed)
       hasInnerChange = true
 
+    // 锁定 import 源字符串，供路径分类与提示信息复用
     const sourceValue = getImportSourceValue(node, sourceCode)
 
     entries.push({
@@ -266,8 +322,9 @@ function buildEntries(
       originalIndex: index,
       isSortable: !(ignoreSideEffectImports && isSideEffectImport(node)),
       category: getImportCategory(node),
-      isTypeOnly: node.importKind === 'type',
+      isTypeOnly: isTypeOnlyImport(node),
       sourceValue,
+      pathCategory: classifyPathCategory(node, sourceValue, pathGroupMatchers),
     })
 
     previousEnd = node.range[1]
@@ -276,6 +333,10 @@ function buildEntries(
   return { entries, hasInnerChange }
 }
 
+/**
+ * 根据配置重新排序 import，并返回修复结果
+ * @description 同时记录第一处顺序冲突，便于输出详细报错
+ */
 function reorderEntries(
   entries: ImportEntry[],
   outerConfig: NormalizedSortOption,
@@ -289,6 +350,7 @@ function reorderEntries(
   const flush = (): void => {
     if (buffer.length === 0)
       return
+    // 将当前连续可排序的片段排序并推入结果
     const sorted = sortSegment(buffer, outerConfig, typeImportHandling)
     if (!didReorder && !areSameOrder(buffer, sorted))
       didReorder = true
@@ -318,17 +380,15 @@ function reorderEntries(
   }
 }
 
+/**
+ * 对同一段 import 进行排序
+ * @description 路径类别 > 类型导入优先级 > 长度/字母 → 最终顺序
+ */
 function sortSegment(
   segment: ImportEntry[],
   config: NormalizedSortOption,
   typeImportHandling: 'ignore' | 'before' | 'after',
 ): ImportEntry[] {
-  if (typeImportHandling === 'ignore') {
-    if (!config.enableLength && !config.enableAlphabet)
-      return [...segment]
-    return [...segment].sort((a, b) => compareEntries(a, b, config))
-  }
-
   return [...segment].sort((a, b) => compareSegmentEntries(a, b, config, typeImportHandling))
 }
 
@@ -338,12 +398,21 @@ function compareSegmentEntries(
   config: NormalizedSortOption,
   typeHandling: 'ignore' | 'before' | 'after',
 ): number {
-  const priority = getExtendedPriority(a, typeHandling) - getExtendedPriority(b, typeHandling)
-  if (priority !== 0)
-    return priority
+  // 首先根据 import 路径类别（含 type-only 配置）排序
+  const pathPriority = getAdjustedPathPriority(a, typeHandling) - getAdjustedPathPriority(b, typeHandling)
+  if (pathPriority !== 0)
+    return pathPriority
+
+  const categoryPriority = getCategoryPriority(a.category) - getCategoryPriority(b.category)
+  if (categoryPriority !== 0)
+    return categoryPriority
+
   return compareEntries(a, b, config)
 }
 
+/**
+ * 处理长度与字母比较的公共逻辑
+ */
 function compareEntries(a: ImportEntry, b: ImportEntry, config: NormalizedSortOption): number {
   if (config.enableLength) {
     const diff = a.lengthScore - b.lengthScore
@@ -360,6 +429,9 @@ function compareEntries(a: ImportEntry, b: ImportEntry, config: NormalizedSortOp
   return a.originalIndex - b.originalIndex
 }
 
+/**
+ * 对命名导入 `{ ... }` 内部执行排序并返回新文本
+ */
 function normalizeImportText(
   node: TSESTree.ImportDeclaration,
   sourceCode: TSESLint.SourceCode,
@@ -460,6 +532,9 @@ function buildSpecifierBlock(
   return inner
 }
 
+/**
+ * 根据排序后的 ImportEntry 重建 import 区块
+ */
 function rebuildBlock(entries: ImportEntry[], eol: string): string {
   return entries.map((entry, index) => {
     let prefix = entry.leadingText
@@ -507,6 +582,9 @@ function compareStrings(a: string, b: string, caseSensitive: boolean): number {
   return 0
 }
 
+/**
+ * 合并用户配置与默认值
+ */
 function normalizeSortOption(option?: SortOption): NormalizedSortOption {
   return {
     enableLength: option?.enableLength ?? true,
@@ -534,15 +612,46 @@ function getImportCategory(node: TSESTree.ImportDeclaration): ImportCategory {
   return 'namespace'
 }
 
-function getExtendedPriority(entry: ImportEntry, handling: 'before' | 'after' | 'ignore'): number {
-  const base = getCategoryPriority(entry.category)
+/**
+ * 计算路径类别优先级，结合 typeImportHandling 调整类型导入位置
+ */
+function getAdjustedPathPriority(entry: ImportEntry, handling: 'before' | 'after' | 'ignore'): number {
+  const base = getPathPriority(entry.pathCategory)
   if (!entry.isTypeOnly || handling === 'ignore')
     return base
 
-  const offset = handling === 'before' ? -4 : 4
+  const offset = handling === 'before' ? -10 : 10
   return base + offset
 }
 
+/**
+ * 路径类别优先级，数值越小越靠前
+ */
+function getPathPriority(category: ImportPathCategory): number {
+  switch (category) {
+    case 'builtin':
+      return 0
+    case 'absolute':
+      return 1
+    case 'parent':
+      return 2
+    case 'sibling':
+      return 3
+    case 'index':
+      return 4
+    case 'external':
+      return 5
+    case 'side-effect':
+      return 6
+    case 'unknown':
+    default:
+      return 7
+  }
+}
+
+/**
+ * type/默认/namespace 等 import 类型的优先级
+ */
 function getCategoryPriority(category: ImportCategory): number {
   switch (category) {
     case 'named':
@@ -577,16 +686,30 @@ function getImportSourceValue(node: TSESTree.ImportDeclaration, sourceCode: TSES
 }
 
 function getImportPathLabel(entry: ImportEntry): string {
-  if (entry.node.specifiers.length === 0)
-    return 'side-effect'
-
-  const label = classifyPath(entry.sourceValue)
-  return entry.isTypeOnly ? `${label}-type` : label
+  const label = entry.pathCategory === 'side-effect' ? 'side-effect' : entry.pathCategory
+  return entry.isTypeOnly && entry.pathCategory !== 'side-effect'
+    ? `${label}-type`
+    : label
 }
 
-function classifyPath(value: string): string {
+/**
+ * 依据自定义 pathGroups 与默认规则判断 import 路径类别
+ */
+function classifyPathCategory(
+  node: TSESTree.ImportDeclaration,
+  value: string,
+  matchers: PathGroupMatcher[],
+): ImportPathCategory {
+  if (node.specifiers.length === 0)
+    return 'side-effect'
+
   if (!value)
     return 'unknown'
+
+  for (const matcher of matchers) {
+    if (matcher.regex.test(value))
+      return matcher.group
+  }
 
   if (value === '.' || value === './')
     return 'index'
@@ -603,8 +726,43 @@ function classifyPath(value: string): string {
   if (value.startsWith('node:'))
     return 'builtin'
 
-  if (builtinModules.includes(value))
+  const normalized = value.split('/')[0]
+  if (builtinModules.includes(value) || builtinModules.includes(normalized))
     return 'builtin'
 
   return 'external'
+}
+
+/**
+ * 将配置的 pathGroups 编译成正则匹配器
+ */
+function createPathGroupMatchers(groups: Options[0]['pathGroups'] = []): PathGroupMatcher[] {
+  const matchers: PathGroupMatcher[] = []
+  groups?.forEach((group) => {
+    if (!group)
+      return
+    try {
+      matchers.push({
+        regex: new RegExp(group.pattern),
+        group: group.group,
+      })
+    }
+    catch {
+      // ignore invalid regex
+    }
+  })
+  return matchers
+}
+
+/**
+ * 判断当前 import 是否仅导入类型
+ */
+function isTypeOnlyImport(node: TSESTree.ImportDeclaration): boolean {
+  if (node.importKind === 'type')
+    return true
+  if (node.importKind === 'value')
+    return false
+  if (node.specifiers.length === 0)
+    return false
+  return node.specifiers.every(spec => spec.type === 'ImportSpecifier' && spec.importKind === 'type')
 }

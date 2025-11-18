@@ -29,6 +29,7 @@ export default createEslintRule<Options, MessageIds>({
     const extension = context.getFilename().split('.').pop()
     if (!extension)
       return {}
+    // 仅在 TypeScript 相关文件启用该规则，JS 文件不做检查
     if (!['ts', 'tsx', 'mts', 'cts'].includes(extension))
       return {}
 

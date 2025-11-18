@@ -9,6 +9,7 @@
 - 外层 import 会按 `长度 → 字母（可选）→ 原顺序` 排列，命名导入亦遵循相同策略；
 - `default` 与 `namespace` 导入保持原始位置，仅重排 `{ ... }` 中的命名导入；
 - 所有行为均可通过 `outer`、`inner`、`ignoreSideEffectImports` 配置启停。
+- 在长度/字母比较之前，会先依据模块来源类别排序：`builtin (node:xxx)` → `absolute` → `parent (../)` → `sibling (./)` → `index` → `external` → `side-effect`。
 
 ## 选项
 
@@ -43,7 +44,8 @@ type Options = [{
 - `outer`：控制整条 import 语句的排序方式；
 - `inner`：控制 `{ ... }` 中命名导入的排序方式；
 - `ignoreSideEffectImports`：是否跳过副作用 import；
-- `typeImportHandling`：`import type` 语句的处理策略，默认 `before` 保证类型导入排在普通导入之前，可选 `after` 或 `ignore` 调整行为。
+- `typeImportHandling`：`import type` 语句的处理策略，默认 `before` 保证类型导入排在普通导入之前，可选 `after` 或 `ignore` 调整行为；
+- `pathGroups`：可选的路径分组配置，使用正则表达式覆盖默认的路径类别（如将 `^@/` 视作 `sibling`）。
 
 ## 示例
 
@@ -164,3 +166,17 @@ import type { Foo } from './types'
 ```
 
 `import type` 会整体移动到指定位置（此例为末尾），避免与其它排序规则（如 `sort-imports`）相互冲突。
+
+### 自定义路径分组
+
+```jsonc
+{
+  "fonds/import-sort": ["error", {
+    "pathGroups": [
+      { "pattern": "^@/", "group": "sibling" }
+    ]
+  }]
+}
+```
+
+该配置会将 `@/foo` 这类别名前缀归类为 `sibling`，优先级介于 `parent` 与 `index` 之间，使别名路径可以与相对路径保持一致顺序。

@@ -115,12 +115,19 @@ export default createEslintRule<Options, MessageIds>({
   },
 })
 
+/**
+ * 判断文件是否被视为样式文件
+ * @description RuleTester 传入 <input> 时也允许执行
+ */
 function isCssLikeFile(filename: string): boolean {
   if (!filename || filename === '<input>' || filename === '<text>')
     return true
   return CSS_FILE_REGEXP.test(filename)
 }
 
+/**
+ * 尝试使用 scss/less/标准 CSS 解析源码
+ */
 function parseStyles(code: string): Root | null {
   const parsers = [
     () => scssSyntax.parse(code, { from: undefined }),
@@ -140,6 +147,9 @@ function parseStyles(code: string): Root | null {
   return null
 }
 
+/**
+ * PostCSS 的 Document 节点中取出第一个 root
+ */
 function normalizeRoot(node: Root | Document): Root | null {
   if (node.type === 'document') {
     const first = node.nodes?.find(child => child.type === 'root')
@@ -148,9 +158,15 @@ function normalizeRoot(node: Root | Document): Root | null {
   return node
 }
 
+/**
+ * 遍历样式 AST，收集每个声明块的修复方案
+ */
 function collectFixes(root: Root, code: string, orderMap: Map<string, number>): FixCandidate[] {
   const fixes: FixCandidate[] = []
 
+  /**
+   * 将当前声明序列按配置排序
+   */
   const flushGroup = (decls: Declaration[]): void => {
     if (decls.length <= 1)
       return
@@ -159,6 +175,9 @@ function collectFixes(root: Root, code: string, orderMap: Map<string, number>): 
       fixes.push(fix)
   }
 
+  /**
+   * 深度遍历容器节点，遇到非声明节点时递归处理
+   */
   const visit = (container: Container | Root): void => {
     if (!('nodes' in container) || !container.nodes)
       return
@@ -168,10 +187,12 @@ function collectFixes(root: Root, code: string, orderMap: Map<string, number>): 
 
     nodes.forEach((node) => {
       if (node.type === 'decl') {
+        // 连续的声明会被累计到 current 中，稍后再整体排序
         current.push(node)
         return
       }
 
+      // 一旦遇到非声明节点，先处理前面聚合的声明
       flushGroup(current)
       current = []
 
@@ -186,6 +207,9 @@ function collectFixes(root: Root, code: string, orderMap: Map<string, number>): 
   return fixes
 }
 
+/**
+ * 根据同一个块内的声明生成排序结果
+ */
 function buildFix(decls: Declaration[], code: string, orderMap: Map<string, number>): FixCandidate | null {
   const ranges: Array<[number, number]> = []
   const entries: SortEntry[] = []
@@ -206,6 +230,7 @@ function buildFix(decls: Declaration[], code: string, orderMap: Map<string, numb
     const [start, end] = ranges[index]
     const leading = code.slice(cursor, start)
     const text = code.slice(start, end)
+    // 记录声明内容及其前缀空白，方便重建时保持注释/空行
     entries.push({
       prop: decl.prop,
       text,
@@ -224,6 +249,7 @@ function buildFix(decls: Declaration[], code: string, orderMap: Map<string, numb
   if (stable)
     return null
 
+  // 重建块内容：首个声明沿用原始 leading，其余使用各自截获的前缀
   const replacement = sorted.map((entry, index) => {
     const prefix = index === 0 ? firstLeading : entry.leading
     return `${prefix}${entry.text}`
@@ -265,6 +291,10 @@ function getOrderIndex(prop: string, orderMap: Map<string, number>): number {
   return index ?? Number.MAX_SAFE_INTEGER
 }
 
+/**
+ * 推算声明的 [start, end] 字符范围
+ * @description 结尾会继续吃掉分号及其后的少量空白，便于整体替换
+ */
 function getDeclarationRange(decl: Declaration, code: string): [number, number] | null {
   const start = decl.source?.start?.offset
   let end = decl.source?.end?.offset
@@ -289,6 +319,9 @@ function getDeclarationRange(decl: Declaration, code: string): [number, number] 
   return [start, end]
 }
 
+/**
+ * 向前回溯，捕获第一个声明前的缩进/空白
+ */
 function getGroupLeadingStart(code: string, start: number): number {
   let index = start
   while (index > 0) {

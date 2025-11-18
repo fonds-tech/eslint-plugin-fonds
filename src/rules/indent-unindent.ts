@@ -64,12 +64,14 @@ export default createEslintRule<Options, MessageIds>({
           return
         const quasi = node.quasi.quasis[0]
         const value = quasi.value.raw
+        // 依据标签所在行的缩进作为模板基准缩进
         const lineStartIndex = context.sourceCode.getIndexFromLoc({
           line: node.loc.start.line,
           column: 0,
         })
         const baseIndent = context.sourceCode.text.slice(lineStartIndex).match(/^\s*/)?.[0] ?? ''
         const targetIndent = baseIndent + ' '.repeat(indent)
+        // 使用 `unindent` 去除模板内部已有缩进后，逐行补上目标缩进
         const pure = unindent([value] as any)
         let final = pure
           .split('\n')

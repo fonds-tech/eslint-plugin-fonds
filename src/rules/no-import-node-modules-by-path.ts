@@ -28,6 +28,7 @@ export default createEslintRule<Options, MessageIds>({
   create: (context) => {
     return {
       'ImportDeclaration': (node) => {
+        // 直接在 import 源头字面值中匹配 node_modules 片段
         if (node.source.value.includes('/node_modules/')) {
           context.report({
             node,
@@ -37,6 +38,7 @@ export default createEslintRule<Options, MessageIds>({
       },
       'CallExpression[callee.name="require"]': (node: any) => {
         const value = node.arguments[0]?.value
+        // CommonJS `require('path/to/node_modules/pkg')` 同样禁止
         if (typeof value === 'string' && value.includes('/node_modules/')) {
           context.report({
             node,

@@ -30,12 +30,14 @@ export default createEslintRule<Options, MessageIds>({
     return {
       AwaitExpression: (node) => {
         let parent: TSESTree.Node | undefined = node.parent
+        // 若沿父级遍历遇到任意函数作用域，则说明 await 不在顶层
         while (parent) {
           if (parent.type === 'FunctionDeclaration' || parent.type === 'FunctionExpression' || parent.type === 'ArrowFunctionExpression') {
             return
           }
           parent = parent.parent
         }
+        // 未找到函数容器，视为顶层 await
         context.report({
           node,
           messageId: 'NoTopLevelAwait',

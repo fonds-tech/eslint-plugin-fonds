@@ -36,6 +36,7 @@ export default createEslintRule<Options, MessageIds>({
         node.specifiers.forEach((n) => {
           const id = n.local.name
           if (names.has(id)) {
+            // 命名重复时仅移除后出现的 specifier，保留首次声明
             context.report({
               node,
               loc: {
@@ -46,6 +47,7 @@ export default createEslintRule<Options, MessageIds>({
               fix(fixer) {
                 const s = n.range[0]
                 let e = n.range[1]
+                // 尝试同时删除拖尾逗号，避免产生孤立分隔符
                 if (context.getSourceCode().text[e] === ',')
                   e += 1
                 return fixer.removeRange([s, e])

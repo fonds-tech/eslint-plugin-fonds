@@ -27,12 +27,14 @@ export default createEslintRule<Options, MessageIds>({
    */
   create: (context) => {
     function isDist(path: string): boolean {
+      // 支持相对路径 ./dist/foo、../dist 以及裸 `dist` 模块名
       return Boolean((path.startsWith('.') && path.match(/\/dist(\/|$)/)))
         || path === 'dist'
     }
 
     return {
       ImportDeclaration: (node) => {
+        // 直接根据字面值判断是否落在 dist 子目录
         if (isDist(node.source.value)) {
           context.report({
             node,

@@ -63,6 +63,7 @@ export default createEslintRule<Options, MessageIds>({
         node: body,
         messageId: 'missingCurlyBrackets',
         * fix(fixer) {
+          // 使用 reporter fixer 插入包裹花括号，并保留原始主体
           yield fixer.insertTextAfter(body, '\n}')
           const token = context.sourceCode.getTokenBefore(body)
           yield fixer.insertTextAfterRange(token!.range, ' {')
@@ -93,6 +94,7 @@ export default createEslintRule<Options, MessageIds>({
         const tests: TSESTree.Expression[] = []
 
         function addIf(node: TSESTree.IfStatement): void {
+          // 收集 if/else-if 链路中所有分支与测试表达式
           statements.push(node.consequent)
           if (node.test)
             tests.push(node.test)

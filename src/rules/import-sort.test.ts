@@ -242,6 +242,56 @@ const invalid: InvalidTestCase[] = [
   },
   {
     code: $`
+      import { type Foo, Bar } from './types'
+      import baz from './baz'
+    `,
+    output: output => expect(output).toMatchInlineSnapshot(`
+      "import { Bar, type Foo } from './types'
+      import baz from './baz'"
+    `),
+  },
+  {
+    code: $`
+      import { foo } from '@/foo'
+      import { bar } from '../bar'
+    `,
+    options: [
+      {
+        pathGroups: [
+          {
+            pattern: '^@/',
+            group: 'sibling',
+          },
+        ],
+      },
+    ],
+    output: output => expect(output).toMatchInlineSnapshot(`
+      "import { bar } from '../bar'
+      import { foo } from '@/foo'"
+    `),
+  },
+  {
+    code: $`
+      import { fonds } from '../src/factory'
+      import { builtinRules } from 'eslint/use-at-your-own-risk'
+      import { flatConfigsToRulesDTS } from 'eslint-typegen/core'
+      import fs from 'node:fs/promises'
+    `,
+    options: [
+      {
+        typeImportHandling: 'after',
+        ignoreSideEffectImports: false,
+      },
+    ],
+    output: output => expect(output).toMatchInlineSnapshot(`
+      "import fs from 'node:fs/promises'
+      import { fonds } from '../src/factory'
+      import { builtinRules } from 'eslint/use-at-your-own-risk'
+      import { flatConfigsToRulesDTS } from 'eslint-typegen/core'"
+    `),
+  },
+  {
+    code: $`
       import type { Foo } from './types'
       import { bar } from './bar'
       import type { Bar } from './types/bar'
@@ -274,6 +324,26 @@ const invalid: InvalidTestCase[] = [
       import './polyfill'
       import type { Zeta } from './types'
       import type { Alpha } from './alpha'"
+    `),
+  },
+  {
+    code: $`
+      import { fonds } from '../src/factory'
+      import { builtinRules } from 'eslint/use-at-your-own-risk'
+      import { flatConfigsToRulesDTS } from 'eslint-typegen/core'
+      import fs from 'node:fs/promises'
+    `,
+    options: [
+      {
+        typeImportHandling: 'after',
+        ignoreSideEffectImports: false,
+      },
+    ],
+    output: output => expect(output).toMatchInlineSnapshot(`
+      "import fs from 'node:fs/promises'
+      import { fonds } from '../src/factory'
+      import { builtinRules } from 'eslint/use-at-your-own-risk'
+      import { flatConfigsToRulesDTS } from 'eslint-typegen/core'"
     `),
   },
 ]

@@ -33,6 +33,7 @@ export default createEslintRule<Options, MessageIds>({
           return
         if (node.consequent.type === 'BlockStatement')
           return
+        // 若条件末尾与执行语句在同一行，则说明缺少换行
         if (node.test.loc.end.line === node.consequent.loc.start.line) {
           context.report({
             node,

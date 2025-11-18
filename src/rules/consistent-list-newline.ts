@@ -145,8 +145,7 @@ export default createEslintRule<Options, MessageIds>({
       if (items.length === 0)
         return
 
-      // Look for the opening bracket, we first try to get the first token of the parent node
-      // and fallback to the token before the first item
+      // 找起始括号：优先取父节点第一个 token，部分节点（CallExpression 等）需要特殊处理
       let startToken = ['CallExpression', 'NewExpression'].includes(node.type)
         ? undefined
         : context.sourceCode.getFirstToken(node)
@@ -165,6 +164,7 @@ export default createEslintRule<Options, MessageIds>({
       const endToken = context.sourceCode.getTokenAfter(items[items.length - 1])
       const startLine = startToken!.loc.start.line
 
+      // 单行结构无需再做换行强制
       if (startToken!.loc.start.line === endToken!.loc.end.line)
         return
 
@@ -173,6 +173,7 @@ export default createEslintRule<Options, MessageIds>({
 
       items.forEach((item, idx) => {
         if (mode == null) {
+          // 第一项决定整体模式：若与起始行一致视为单行，否则为多行
           mode = item.loc.start.line === lastLine ? 'inline' : 'newline'
           lastLine = item.loc.end.line
           return
@@ -181,6 +182,7 @@ export default createEslintRule<Options, MessageIds>({
         const currentStart = item.loc.start.line
 
         if (mode === 'newline' && currentStart === lastLine) {
+          // 多行模式下若连续元素出现在同一行，则缺少预期换行
           context.report({
             node: item,
             messageId: 'shouldWrap',
@@ -193,6 +195,7 @@ export default createEslintRule<Options, MessageIds>({
           })
         }
         else if (mode === 'inline' && currentStart !== lastLine) {
+          // 单行模式下若元素起始行变化，尝试移除间距并合并为单行
           const lastItem = items[idx - 1]
           if (context.sourceCode.getCommentsBefore(item).length > 0)
             return
@@ -224,6 +227,7 @@ export default createEslintRule<Options, MessageIds>({
 
       const lastItem = items[items.length - 1]!
       if (mode === 'newline' && endLoc.line === lastLine) {
+        // 在多行模式下若闭合括号同在一行，则补充尾部换行
         context.report({
           node: lastItem,
           messageId: 'shouldWrap',
@@ -244,6 +248,7 @@ export default createEslintRule<Options, MessageIds>({
 
         const content = context.sourceCode.text.slice(lastItem.range[1], endRange)
         if (content.includes('\n')) {
+          // 单行模式闭合位置存在换行，则清理换行与拖尾空格
           context.report({
             node: lastItem,
             messageId: 'shouldNotWrap',
@@ -271,6 +276,7 @@ export default createEslintRule<Options, MessageIds>({
         check(node, node.elements)
       },
       ImportDeclaration: (node) => {
+        // 默认忽略 default 导入，防止 `import foo, { bar }` 误判
         check(
           node,
           node.specifiers[0]?.type === 'ImportDefaultSpecifier'
@@ -298,6 +304,7 @@ export default createEslintRule<Options, MessageIds>({
       ArrowFunctionExpression: (node) => {
         if (node.params.length <= 1)
           return
+        // 单参数箭头函数保持原样，多参数才执行换行规范
         check(
           node,
           node.params,
@@ -343,6 +350,7 @@ export default createEslintRule<Options, MessageIds>({
       JSONArrayExpression(node: TSESTree.ArrayExpression) {
         if (hasComments(node))
           return
+        // JSON AST（例如在 i18n 文件）若包含注释则跳过，防止破坏手写说明
         check(node, node.elements)
       },
       JSONObjectExpression(node: TSESTree.ObjectExpression) {

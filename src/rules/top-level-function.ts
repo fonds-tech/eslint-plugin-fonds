@@ -32,6 +32,7 @@ export default createEslintRule<Options, MessageIds>({
         if (node.parent.type !== 'Program' && node.parent.type !== 'ExportNamedDeclaration')
           return
 
+        // 只处理 const 单变量声明，避免同时改动多个声明
         if (node.declarations.length !== 1)
           return
         if (node.kind !== 'const')
@@ -41,6 +42,7 @@ export default createEslintRule<Options, MessageIds>({
 
         const declaration = node.declarations[0]
 
+        // 仅当初始化为函数（箭头或函数表达式）时才需转换
         if (
           declaration.init?.type !== 'ArrowFunctionExpression'
           && declaration.init?.type !== 'FunctionExpression'
@@ -75,6 +77,7 @@ export default createEslintRule<Options, MessageIds>({
             const textArgs = fnExpression.params.length
               ? code.slice(fnExpression.params[0].range[0], fnExpression.params[fnExpression.params.length - 1].range[1])
               : ''
+            // 若函数体为表达式，需要包裹成块并 return 出去
             const textBody = body.type === 'BlockStatement'
               ? code.slice(body.range[0], body.range[1])
               : `{\n  return ${code.slice(body.range[0], body.range[1])}\n}`
@@ -86,6 +89,7 @@ export default createEslintRule<Options, MessageIds>({
               : ''
             const textAsync = fnExpression.async ? 'async ' : ''
 
+            // 最终将 const 声明替换为 function 声明
             const final = `${textAsync}function ${textName} ${textGeneric}(${textArgs})${textTypeReturn} ${textBody}`
             // console.log({
             //   input: code.slice(node.range[0], node.range[1]),
