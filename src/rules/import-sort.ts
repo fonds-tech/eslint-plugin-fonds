@@ -6,10 +6,11 @@
  * 以上行为均可通过配置启用/禁用或切换大小写敏感。
  */
 import type { TSESLint, TSESTree } from '@typescript-eslint/utils'
+import { builtinModules } from 'node:module'
 import { createEslintRule } from '../utils'
 
 export const RULE_NAME = 'import-sort'
-export type MessageIds = 'importSort'
+export type MessageIds = 'importSort' | 'importSortDetailed'
 export interface SortOption {
   enableLength?: boolean
   enableAlphabet?: boolean
@@ -40,9 +41,20 @@ interface ImportEntry {
   isSortable: boolean
   category: ImportCategory
   isTypeOnly: boolean
+  sourceValue: string
 }
 
 type ImportCategory = 'named' | 'default' | 'namespace' | 'side-effect'
+interface ReorderResult {
+  finalEntries: ImportEntry[]
+  didReorder: boolean
+  mismatch?: MismatchInfo
+}
+
+interface MismatchInfo {
+  expected: ImportEntry
+  actual: ImportEntry
+}
 
 export default createEslintRule<Options, MessageIds>({
   name: RULE_NAME,
@@ -115,6 +127,7 @@ export default createEslintRule<Options, MessageIds>({
     ],
     messages: {
       importSort: 'Imports should be ordered based on configured import-sort strategy',
+      importSortDetailed: 'Expected {{expected}} ({{expectedCategory}}) to come before {{actual}} ({{actualCategory}})',
     },
   },
   defaultOptions: [
@@ -130,7 +143,7 @@ export default createEslintRule<Options, MessageIds>({
         caseSensitive: true,
       },
       ignoreSideEffectImports: true,
-      typeImportHandling: 'ignore',
+      typeImportHandling: 'before',
     },
   ],
   /**
@@ -161,13 +174,22 @@ export default createEslintRule<Options, MessageIds>({
         if (entries.length <= 1 && !hasInnerChange)
           return
 
-        const { finalEntries, didReorder } = reorderEntries(entries, outerConfig, typeImportHandling)
+        const { finalEntries, didReorder, mismatch } = reorderEntries(entries, outerConfig, typeImportHandling)
         if (!didReorder && !hasInnerChange)
           return
 
         const blockStart = importNodes[0].range[0]
         const blockEnd = importNodes[importNodes.length - 1].range[1]
         const replacement = rebuildBlock(finalEntries, eol)
+        const messageId: MessageIds = mismatch ? 'importSortDetailed' : 'importSort'
+        const data = mismatch
+          ? {
+              expected: mismatch.expected.sourceValue,
+              expectedCategory: getImportPathLabel(mismatch.expected),
+              actual: mismatch.actual.sourceValue,
+              actualCategory: getImportPathLabel(mismatch.actual),
+            }
+          : undefined
 
         context.report({
           node: importNodes[0],
@@ -175,7 +197,8 @@ export default createEslintRule<Options, MessageIds>({
             start: sourceCode.getLocFromIndex(blockStart),
             end: sourceCode.getLocFromIndex(blockEnd),
           },
-          messageId: 'importSort',
+          messageId,
+          data,
           fix(fixer) {
             return fixer.replaceTextRange([blockStart, blockEnd], replacement)
           },
@@ -232,6 +255,8 @@ function buildEntries(
     if (changed)
       hasInnerChange = true
 
+    const sourceValue = getImportSourceValue(node, sourceCode)
+
     entries.push({
       node,
       text,
@@ -242,6 +267,7 @@ function buildEntries(
       isSortable: !(ignoreSideEffectImports && isSideEffectImport(node)),
       category: getImportCategory(node),
       isTypeOnly: node.importKind === 'type',
+      sourceValue,
     })
 
     previousEnd = node.range[1]
@@ -254,10 +280,11 @@ function reorderEntries(
   entries: ImportEntry[],
   outerConfig: NormalizedSortOption,
   typeImportHandling: 'ignore' | 'before' | 'after',
-): { finalEntries: ImportEntry[], didReorder: boolean } {
+): ReorderResult {
   const finalEntries: ImportEntry[] = []
   let didReorder = false
   let buffer: ImportEntry[] = []
+  let mismatch: MismatchInfo | null = null
 
   const flush = (): void => {
     if (buffer.length === 0)
@@ -265,6 +292,11 @@ function reorderEntries(
     const sorted = sortSegment(buffer, outerConfig, typeImportHandling)
     if (!didReorder && !areSameOrder(buffer, sorted))
       didReorder = true
+    if (!mismatch) {
+      const diffIndex = findFirstDifferenceIndex(buffer, sorted)
+      if (diffIndex !== -1)
+        mismatch = { expected: sorted[diffIndex], actual: buffer[diffIndex] }
+    }
     finalEntries.push(...sorted)
     buffer = []
   }
@@ -279,7 +311,11 @@ function reorderEntries(
   })
 
   flush()
-  return { finalEntries, didReorder }
+  return {
+    finalEntries,
+    didReorder,
+    mismatch: mismatch ?? undefined,
+  }
 }
 
 function sortSegment(
@@ -524,4 +560,51 @@ function getCategoryPriority(category: ImportCategory): number {
 
 function areSameOrder(a: ImportEntry[], b: ImportEntry[]): boolean {
   return a.length === b.length && a.every((entry, index) => entry === b[index])
+}
+
+function findFirstDifferenceIndex(original: ImportEntry[], sorted: ImportEntry[]): number {
+  for (let i = 0; i < original.length; i += 1) {
+    if (original[i] !== sorted[i])
+      return i
+  }
+  return -1
+}
+
+function getImportSourceValue(node: TSESTree.ImportDeclaration, sourceCode: TSESLint.SourceCode): string {
+  if (typeof node.source.value === 'string')
+    return node.source.value
+  return sourceCode.getText(node.source)
+}
+
+function getImportPathLabel(entry: ImportEntry): string {
+  if (entry.node.specifiers.length === 0)
+    return 'side-effect'
+
+  const label = classifyPath(entry.sourceValue)
+  return entry.isTypeOnly ? `${label}-type` : label
+}
+
+function classifyPath(value: string): string {
+  if (!value)
+    return 'unknown'
+
+  if (value === '.' || value === './')
+    return 'index'
+
+  if (value.startsWith('../'))
+    return 'parent'
+
+  if (value.startsWith('./'))
+    return 'sibling'
+
+  if (value.startsWith('/'))
+    return 'absolute'
+
+  if (value.startsWith('node:'))
+    return 'builtin'
+
+  if (builtinModules.includes(value))
+    return 'builtin'
+
+  return 'external'
 }
