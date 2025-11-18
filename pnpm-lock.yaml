@@ -18,8 +18,8 @@ importers:
         specifier: ^9.1.0
         version: 9.1.0
       '@fonds/eslint-config':
-        specifier: ^1.0.8
-        version: 1.0.8(@vue/compiler-sfc@3.3.13)(eslint@9.22.0(jiti@2.4.2))(typescript@5.8.2)(vitest@3.0.8(@types/debug@4.1.12)(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.3)(yaml@2.8.1))
+        specifier: ^1.0.9
+        version: 1.0.9(@vue/compiler-sfc@3.3.13)(eslint@9.22.0(jiti@2.4.2))(typescript@5.8.2)(vitest@3.0.8(@types/debug@4.1.12)(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.3)(yaml@2.8.1))
       '@types/eslint':
         specifier: ^9.6.1
         version: 9.6.1
@@ -499,8 +499,8 @@ packages:
     resolution: {integrity: sha512-43/qtrDUokr7LJqoF2c3+RInu/t4zfrpYdoSDfYyhg52rwLV6TnOvdG4fXm7IkSB3wErkcmJS9iEhjVtOSEjjA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
-  '@fonds/eslint-config@1.0.8':
-    resolution: {integrity: sha512-ZTW7/Xkb+LZVuzOaUpNn6riI9tI6HRRkq4hMfOUqAk8pL5z5h8fSkZ9e4iPClJPijY44o54EZluCv7y0KU2MMQ==}
+  '@fonds/eslint-config@1.0.9':
+    resolution: {integrity: sha512-W6CBsnDkyiTpeeD4LT3VUR0CXYtB5W+idstkunJSCnoytwVq9RUC2hSDckNpZoHLIqOvVUavtCq6E70cgeyebg==}
     hasBin: true
     peerDependencies:
       '@eslint-react/eslint-plugin': ^2.0.1
@@ -1402,11 +1402,6 @@ packages:
 
   eslint-merge-processors@2.0.0:
     resolution: {integrity: sha512-sUuhSf3IrJdGooquEUB5TNpGNpBoQccbnaLHsb1XkBLUPPqCNivCpY05ZcpCOiV9uHwO2yxXEWVczVclzMxYlA==}
-    peerDependencies:
-      eslint: '*'
-
-  eslint-plugin-antfu@3.1.1:
-    resolution: {integrity: sha512-7Q+NhwLfHJFvopI2HBZbSxWXngTwBLKxW1AGXLr2lEGxcEIK/AsDs8pn8fvIizl5aZjBbVbVK5ujmMpBe4Tvdg==}
     peerDependencies:
       eslint: '*'
 
@@ -3304,7 +3299,7 @@ snapshots:
       '@eslint/core': 0.17.0
       levn: 0.4.1
 
-  '@fonds/eslint-config@1.0.8(@vue/compiler-sfc@3.3.13)(eslint@9.22.0(jiti@2.4.2))(typescript@5.8.2)(vitest@3.0.8(@types/debug@4.1.12)(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.3)(yaml@2.8.1))':
+  '@fonds/eslint-config@1.0.9(@vue/compiler-sfc@3.3.13)(eslint@9.22.0(jiti@2.4.2))(typescript@5.8.2)(vitest@3.0.8(@types/debug@4.1.12)(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.3)(yaml@2.8.1))':
     dependencies:
       '@antfu/install-pkg': 1.1.0
       '@clack/prompts': 0.11.0
@@ -3320,8 +3315,8 @@ snapshots:
       eslint-config-flat-gitignore: 2.1.0(eslint@9.22.0(jiti@2.4.2))
       eslint-flat-config-utils: 2.1.4
       eslint-merge-processors: 2.0.0(eslint@9.22.0(jiti@2.4.2))
-      eslint-plugin-antfu: 3.1.1(eslint@9.22.0(jiti@2.4.2))
       eslint-plugin-command: 3.3.1(eslint@9.22.0(jiti@2.4.2))
+      eslint-plugin-fonds: 'link:'
       eslint-plugin-import-lite: 0.3.0(eslint@9.22.0(jiti@2.4.2))(typescript@5.8.2)
       eslint-plugin-jsdoc: 61.2.1(eslint@9.22.0(jiti@2.4.2))
       eslint-plugin-jsonc: 2.21.0(eslint@9.22.0(jiti@2.4.2))
@@ -4241,10 +4236,6 @@ snapshots:
       jsonc-eslint-parser: 2.4.1
 
   eslint-merge-processors@2.0.0(eslint@9.22.0(jiti@2.4.2)):
-    dependencies:
-      eslint: 9.22.0(jiti@2.4.2)
-
-  eslint-plugin-antfu@3.1.1(eslint@9.22.0(jiti@2.4.2)):
     dependencies:
       eslint: 9.22.0(jiti@2.4.2)
 

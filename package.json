@@ -42,7 +42,7 @@
   "devDependencies": {
     "@antfu/ni": "^24.1.0",
     "@antfu/utils": "^9.1.0",
-    "@fonds/eslint-config": "^1.0.8",
+    "@fonds/eslint-config": "^1.0.9",
     "@types/eslint": "^9.6.1",
     "@types/node": "^22.13.10",
     "@typescript-eslint/typescript-estree": "^8.26.1",
