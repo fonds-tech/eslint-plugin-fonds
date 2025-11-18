@@ -35,7 +35,7 @@ type Options = [{
     "outer": { "enableLength": true, "enableAlphabet": true, "caseSensitive": true },
     "inner": { "enableLength": true, "enableAlphabet": true, "caseSensitive": true },
     "ignoreSideEffectImports": true,
-    "typeImportHandling": "ignore"
+    "typeImportHandling": "before"
   }
 ]
 ```
@@ -43,7 +43,7 @@ type Options = [{
 - `outer`：控制整条 import 语句的排序方式；
 - `inner`：控制 `{ ... }` 中命名导入的排序方式；
 - `ignoreSideEffectImports`：是否跳过副作用 import；
-- `typeImportHandling`：`import type` 语句的处理策略，`ignore`（默认）表示不排序，可选 `before`/`after` 分别指定它们在普通导入之前或之后。
+- `typeImportHandling`：`import type` 语句的处理策略，默认 `before` 保证类型导入排在普通导入之前，可选 `after` 或 `ignore` 调整行为。
 
 ## 示例
 

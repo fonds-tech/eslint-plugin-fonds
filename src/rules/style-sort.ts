@@ -11,7 +11,7 @@ import scssSyntax from 'postcss-scss'
 import { createEslintRule } from '../utils'
 
 export const RULE_NAME = 'style-sort'
-export type MessageIds = 'styleSort'
+export type MessageIds = 'styleSort' | 'styleSortDetailed'
 export type Options = [
   {
     groupedProperties?: string[]
@@ -32,6 +32,10 @@ interface SortEntry {
 interface FixCandidate {
   range: [number, number]
   replacement: string
+  mismatch?: {
+    expected: SortEntry
+    actual: SortEntry
+  }
 }
 
 const CSS_FILE_REGEXP = /\.(?:[cps]c?ss|less)$/i
@@ -61,6 +65,7 @@ export default createEslintRule<Options, MessageIds>({
     ],
     messages: {
       styleSort: 'CSS declarations should follow the configured style-sort order',
+      styleSortDetailed: 'Expected "{{expected}}" to come before "{{actual}}"',
     },
   },
   defaultOptions: [{}],
@@ -87,12 +92,19 @@ export default createEslintRule<Options, MessageIds>({
 
         const fixes = collectFixes(root, sourceCode.text, orderMap)
         fixes.forEach((fix) => {
+          const messageId: MessageIds = fix.mismatch ? 'styleSortDetailed' : 'styleSort'
           context.report({
             loc: {
               start: sourceCode.getLocFromIndex(fix.range[0]),
               end: sourceCode.getLocFromIndex(fix.range[1]),
             },
-            messageId: 'styleSort',
+            messageId,
+            data: fix.mismatch
+              ? {
+                  expected: fix.mismatch.expected.prop,
+                  actual: fix.mismatch.actual.prop,
+                }
+              : undefined,
             fix(fixer) {
               return fixer.replaceTextRange(fix.range, fix.replacement)
             },
@@ -217,9 +229,18 @@ function buildFix(decls: Declaration[], code: string, orderMap: Map<string, numb
     return `${prefix}${entry.text}`
   }).join('')
 
+  const diffIndex = findFirstDifferenceIndex(entries, sorted)
+  const mismatch = diffIndex >= 0
+    ? {
+        expected: sorted[diffIndex],
+        actual: entries[diffIndex],
+      }
+    : undefined
+
   return {
     range: [blockStart, blockEnd],
     replacement,
+    mismatch,
   }
 }
 
@@ -279,4 +300,12 @@ function getGroupLeadingStart(code: string, start: number): number {
     break
   }
   return index
+}
+
+function findFirstDifferenceIndex(original: SortEntry[], sorted: SortEntry[]): number {
+  for (let i = 0; i < original.length; i += 1) {
+    if (original[i] !== sorted[i])
+      return i
+  }
+  return -1
 }

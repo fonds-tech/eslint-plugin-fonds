@@ -76,7 +76,7 @@ export default createEslintRule<Options, MessageIds>({
           typeImportHandling: {
             type: 'string',
             enum: ['ignore', 'before', 'after'],
-            default: 'ignore',
+            default: 'before',
             description: 'Decide how `import type` declarations participate in sorting',
           },
           outer: {
@@ -157,7 +157,7 @@ export default createEslintRule<Options, MessageIds>({
       outer,
       inner,
       ignoreSideEffectImports = true,
-      typeImportHandling = 'ignore',
+      typeImportHandling = 'before',
     } = option ?? {}
 
     const outerConfig = normalizeSortOption(outer)

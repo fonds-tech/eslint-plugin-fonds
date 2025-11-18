@@ -36,8 +36,8 @@ const valids: ValidTestCase[] = [
   },
   {
     code: $`
-      import defaultExport from 'very-long-module'
       import { a } from 'a'
+      import defaultExport from 'very-long-module'
       
       export function run() {
         return defaultExport(a)
@@ -128,14 +128,14 @@ const invalid: InvalidTestCase[] = [
       },
     ],
     output: output => expect(output).toMatchInlineSnapshot(`
-      "import './style.css'
-      import a from 'foo/a'
-      import {
+      "import {
         b,
         zebra,
         alpha,
       } from 'foo/list'
+      import a from 'foo/a'
       import Z from 'foo/Z'
+      import './style.css'
 
       export function useList() {
         return [Z, a, alpha]
@@ -163,9 +163,9 @@ const invalid: InvalidTestCase[] = [
       import './style.css'
 
       import { bb } from 'bb-module'
+      import { alpha, componentLongName } from 'module-components'
       // util helpers
       import helperUtility from 'helper-utils'
-      import { alpha, componentLongName } from 'module-components'
 
       console.log(helperUtility, alpha)
 
@@ -203,12 +203,12 @@ const invalid: InvalidTestCase[] = [
         Zebra as Z,
         delta as D,
       } from 'foo-kit'
-      import * as helpers from 'helpers'
       import {
         gamma,
         beta as B,
         alphaBeta,
       } from 'gamma-kit'
+      import * as helpers from 'helpers'
 
       const result = foo + helpers.value + B
       export { result }"
@@ -233,8 +233,8 @@ const invalid: InvalidTestCase[] = [
     ],
     output: output => expect(output).toMatchInlineSnapshot(`
       "import { a } from 'a'
-      import short from 'x'
       import { beta } from 'beta-module'
+      import short from 'x'
       import defaultLong from 'long-module-path'
 
       console.log(defaultLong, short)"
@@ -247,11 +247,6 @@ const invalid: InvalidTestCase[] = [
       import type { Bar } from './types/bar'
       import baz from './baz'
     `,
-    options: [
-      {
-        typeImportHandling: 'before',
-      },
-    ],
     output: output => expect(output).toMatchInlineSnapshot(`
       "import type { Foo } from './types'
       import type { Bar } from './types/bar'
