@@ -12,6 +12,7 @@ import consistentListNewline from './rules/consistent-list-newline'
 import curly from './rules/curly'
 import ifNewline from './rules/if-newline'
 import importDedupe from './rules/import-dedupe'
+import importSort from './rules/import-sort'
 import indentUnindent from './rules/indent-unindent'
 import noImportDist from './rules/no-import-dist'
 import noImportNodeModulesByPath from './rules/no-import-node-modules-by-path'
@@ -31,6 +32,7 @@ const plugin = {
     'curly': curly,
     'if-newline': ifNewline,
     'import-dedupe': importDedupe,
+    'import-sort': importSort,
     'indent-unindent': indentUnindent,
     'no-import-dist': noImportDist,
     'no-import-node-modules-by-path': noImportNodeModulesByPath,

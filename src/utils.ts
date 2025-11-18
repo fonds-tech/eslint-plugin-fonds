@@ -17,6 +17,7 @@ const hasDocs = [
   'curly',
   'if-newline',
   'import-dedupe',
+  'import-sort',
   'indent-unindent',
   'top-level-function',
 ]
