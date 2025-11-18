@@ -19,6 +19,7 @@ const hasDocs = [
   'import-dedupe',
   'import-sort',
   'indent-unindent',
+  'style-sort',
   'top-level-function',
 ]
 

@@ -18,6 +18,7 @@ import noImportDist from './rules/no-import-dist'
 import noImportNodeModulesByPath from './rules/no-import-node-modules-by-path'
 import noTopLevelAwait from './rules/no-top-level-await'
 import noTsExportEqual from './rules/no-ts-export-equal'
+import styleSort from './rules/style-sort'
 import topLevelFunction from './rules/top-level-function'
 
 const plugin = {
@@ -38,6 +39,7 @@ const plugin = {
     'no-import-node-modules-by-path': noImportNodeModulesByPath,
     'no-top-level-await': noTopLevelAwait,
     'no-ts-export-equal': noTsExportEqual,
+    'style-sort': styleSort,
     'top-level-function': topLevelFunction,
   },
 } satisfies ESLint.Plugin
