@@ -20,6 +20,7 @@ export type Options = [
     outer?: SortOption
     inner?: SortOption
     ignoreSideEffectImports?: boolean
+    typeImportHandling?: 'ignore' | 'before' | 'after'
   },
 ]
 
@@ -38,6 +39,7 @@ interface ImportEntry {
   originalIndex: number
   isSortable: boolean
   category: ImportCategory
+  isTypeOnly: boolean
 }
 
 type ImportCategory = 'named' | 'default' | 'namespace' | 'side-effect'
@@ -58,6 +60,12 @@ export default createEslintRule<Options, MessageIds>({
             type: 'boolean',
             default: true,
             description: 'Skip sorting side-effect imports like `import "./foo.css";`',
+          },
+          typeImportHandling: {
+            type: 'string',
+            enum: ['ignore', 'before', 'after'],
+            default: 'ignore',
+            description: 'Decide how `import type` declarations participate in sorting',
           },
           outer: {
             type: 'object',
@@ -122,6 +130,7 @@ export default createEslintRule<Options, MessageIds>({
         caseSensitive: true,
       },
       ignoreSideEffectImports: true,
+      typeImportHandling: 'ignore',
     },
   ],
   /**
@@ -135,6 +144,7 @@ export default createEslintRule<Options, MessageIds>({
       outer,
       inner,
       ignoreSideEffectImports = true,
+      typeImportHandling = 'ignore',
     } = option ?? {}
 
     const outerConfig = normalizeSortOption(outer)
@@ -151,7 +161,7 @@ export default createEslintRule<Options, MessageIds>({
         if (entries.length <= 1 && !hasInnerChange)
           return
 
-        const { finalEntries, didReorder } = reorderEntries(entries, outerConfig)
+        const { finalEntries, didReorder } = reorderEntries(entries, outerConfig, typeImportHandling)
         if (!didReorder && !hasInnerChange)
           return
 
@@ -231,6 +241,7 @@ function buildEntries(
       originalIndex: index,
       isSortable: !(ignoreSideEffectImports && isSideEffectImport(node)),
       category: getImportCategory(node),
+      isTypeOnly: node.importKind === 'type',
     })
 
     previousEnd = node.range[1]
@@ -239,7 +250,11 @@ function buildEntries(
   return { entries, hasInnerChange }
 }
 
-function reorderEntries(entries: ImportEntry[], outerConfig: NormalizedSortOption): { finalEntries: ImportEntry[], didReorder: boolean } {
+function reorderEntries(
+  entries: ImportEntry[],
+  outerConfig: NormalizedSortOption,
+  typeImportHandling: 'ignore' | 'before' | 'after',
+): { finalEntries: ImportEntry[], didReorder: boolean } {
   const finalEntries: ImportEntry[] = []
   let didReorder = false
   let buffer: ImportEntry[] = []
@@ -247,7 +262,7 @@ function reorderEntries(entries: ImportEntry[], outerConfig: NormalizedSortOptio
   const flush = (): void => {
     if (buffer.length === 0)
       return
-    const sorted = sortSegment(buffer, outerConfig)
+    const sorted = sortSegment(buffer, outerConfig, typeImportHandling)
     if (!didReorder && !areSameOrder(buffer, sorted))
       didReorder = true
     finalEntries.push(...sorted)
@@ -267,14 +282,27 @@ function reorderEntries(entries: ImportEntry[], outerConfig: NormalizedSortOptio
   return { finalEntries, didReorder }
 }
 
-function sortSegment(segment: ImportEntry[], config: NormalizedSortOption): ImportEntry[] {
-  if (!config.enableLength && !config.enableAlphabet)
-    return [...segment]
-  return [...segment].sort((a, b) => compareSegmentEntries(a, b, config))
+function sortSegment(
+  segment: ImportEntry[],
+  config: NormalizedSortOption,
+  typeImportHandling: 'ignore' | 'before' | 'after',
+): ImportEntry[] {
+  if (typeImportHandling === 'ignore') {
+    if (!config.enableLength && !config.enableAlphabet)
+      return [...segment]
+    return [...segment].sort((a, b) => compareEntries(a, b, config))
+  }
+
+  return [...segment].sort((a, b) => compareSegmentEntries(a, b, config, typeImportHandling))
 }
 
-function compareSegmentEntries(a: ImportEntry, b: ImportEntry, config: NormalizedSortOption): number {
-  const priority = getCategoryPriority(a.category) - getCategoryPriority(b.category)
+function compareSegmentEntries(
+  a: ImportEntry,
+  b: ImportEntry,
+  config: NormalizedSortOption,
+  typeHandling: 'ignore' | 'before' | 'after',
+): number {
+  const priority = getExtendedPriority(a, typeHandling) - getExtendedPriority(b, typeHandling)
   if (priority !== 0)
     return priority
   return compareEntries(a, b, config)
@@ -468,6 +496,15 @@ function getImportCategory(node: TSESTree.ImportDeclaration): ImportCategory {
     return 'default'
 
   return 'namespace'
+}
+
+function getExtendedPriority(entry: ImportEntry, handling: 'before' | 'after' | 'ignore'): number {
+  const base = getCategoryPriority(entry.category)
+  if (!entry.isTypeOnly || handling === 'ignore')
+    return base
+
+  const offset = handling === 'before' ? -4 : 4
+  return base + offset
 }
 
 function getCategoryPriority(category: ImportCategory): number {

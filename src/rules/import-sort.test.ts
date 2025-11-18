@@ -128,14 +128,14 @@ const invalid: InvalidTestCase[] = [
       },
     ],
     output: output => expect(output).toMatchInlineSnapshot(`
-      "import {
+      "import './style.css'
+      import a from 'foo/a'
+      import {
         b,
         zebra,
         alpha,
       } from 'foo/list'
-      import a from 'foo/a'
       import Z from 'foo/Z'
-      import './style.css'
 
       export function useList() {
         return [Z, a, alpha]
@@ -163,9 +163,9 @@ const invalid: InvalidTestCase[] = [
       import './style.css'
 
       import { bb } from 'bb-module'
-      import { alpha, componentLongName } from 'module-components'
       // util helpers
       import helperUtility from 'helper-utils'
+      import { alpha, componentLongName } from 'module-components'
 
       console.log(helperUtility, alpha)
 
@@ -233,11 +233,52 @@ const invalid: InvalidTestCase[] = [
     ],
     output: output => expect(output).toMatchInlineSnapshot(`
       "import { a } from 'a'
-      import { beta } from 'beta-module'
       import short from 'x'
+      import { beta } from 'beta-module'
       import defaultLong from 'long-module-path'
 
       console.log(defaultLong, short)"
+    `),
+  },
+  {
+    code: $`
+      import type { Foo } from './types'
+      import { bar } from './bar'
+      import type { Bar } from './types/bar'
+      import baz from './baz'
+    `,
+    options: [
+      {
+        typeImportHandling: 'before',
+      },
+    ],
+    output: output => expect(output).toMatchInlineSnapshot(`
+      "import type { Foo } from './types'
+      import type { Bar } from './types/bar'
+      import { bar } from './bar'
+      import baz from './baz'"
+    `),
+  },
+  {
+    code: $`
+      import type { Zeta } from './types'
+      import { foo } from './foo'
+      import type { Alpha } from './alpha'
+      import './polyfill'
+      import beta from './beta'
+    `,
+    options: [
+      {
+        typeImportHandling: 'after',
+        ignoreSideEffectImports: false,
+      },
+    ],
+    output: output => expect(output).toMatchInlineSnapshot(`
+      "import { foo } from './foo'
+      import beta from './beta'
+      import './polyfill'
+      import type { Zeta } from './types'
+      import type { Alpha } from './alpha'"
     `),
   },
 ]

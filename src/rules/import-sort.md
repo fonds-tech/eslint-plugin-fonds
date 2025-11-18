@@ -23,6 +23,7 @@ type Options = [{
   outer?: SortOption
   inner?: SortOption
   ignoreSideEffectImports?: boolean
+  typeImportHandling?: 'ignore' | 'before' | 'after'
 }]
 ```
 
@@ -33,14 +34,16 @@ type Options = [{
   {
     "outer": { "enableLength": true, "enableAlphabet": true, "caseSensitive": true },
     "inner": { "enableLength": true, "enableAlphabet": true, "caseSensitive": true },
-    "ignoreSideEffectImports": true
+    "ignoreSideEffectImports": true,
+    "typeImportHandling": "ignore"
   }
 ]
 ```
 
 - `outer`：控制整条 import 语句的排序方式；
 - `inner`：控制 `{ ... }` 中命名导入的排序方式；
-- `ignoreSideEffectImports`：是否跳过副作用 import。
+- `ignoreSideEffectImports`：是否跳过副作用 import；
+- `typeImportHandling`：`import type` 语句的处理策略，`ignore`（默认）表示不排序，可选 `before`/`after` 分别指定它们在普通导入之前或之后。
 
 ## 示例
 
@@ -129,3 +132,35 @@ import { bb } from 'bb-module'
 import helperUtility from 'helper-utils'
 import { alpha, componentLongName } from 'module-components'
 ```
+
+### 类型导入分组
+
+#### ESLint 配置
+
+```jsonc
+{
+  "fonds/import-sort": ["error", { "typeImportHandling": "after" }]
+}
+```
+
+#### 效果
+
+```ts
+import type { Foo } from './types'
+import { useFoo } from './foo'
+import './polyfill'
+/* eslint-disable perfectionist/sort-imports */
+import beta from './beta'
+```
+
+⟶ 修复后：
+
+```ts
+import { useFoo } from './foo'
+/* eslint-disable perfectionist/sort-imports */
+import beta from './beta'
+import './polyfill'
+import type { Foo } from './types'
+```
+
+`import type` 会整体移动到指定位置（此例为末尾），避免与其它排序规则（如 `sort-imports`）相互冲突。
