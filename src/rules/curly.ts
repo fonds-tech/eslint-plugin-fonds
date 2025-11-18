@@ -63,6 +63,11 @@ export default createEslintRule<Options, MessageIds>({
         node: body,
         messageId: 'missingCurlyBrackets',
         * fix(fixer) {
+          /**
+           * 以最小代价包裹花括号：
+           * - 在语句后插入结尾 `}`（含换行）；
+           * - 在前一个 token 后插入起始 ` {`，保留当前缩进与空白。
+           */
           // 使用 reporter fixer 插入包裹花括号，并保留原始主体
           yield fixer.insertTextAfter(body, '\n}')
           const token = context.sourceCode.getTokenBefore(body)

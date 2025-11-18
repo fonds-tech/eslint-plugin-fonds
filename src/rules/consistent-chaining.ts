@@ -60,6 +60,10 @@ export default createEslintRule<Options, MessageIds>({
 
     return {
       MemberExpression(node) {
+        /**
+         * 自底向上寻找链式访问的根节点，并按“对象 → 成员访问/调用”拆解为成员序列；
+         * 对每个成员判断是单行或多行模式，首次命中决定全局模式，之后保持一致性。
+         */
         // 自底向上寻找当前成员表达式的最顶层根节点（链表头）
         let root: TSESTree.Node = node
         while (root.parent && (root.parent.type === 'MemberExpression' || root.parent.type === 'CallExpression'))
@@ -129,6 +133,7 @@ export default createEslintRule<Options, MessageIds>({
                 name: root.type,
               },
               fix(fixer) {
+                // 统一到多行：在前一个 token 后插入换行；统一到单行：移除区间内换行/空白
                 if (mode === 'multi')
                   return fixer.insertTextAfter(tokenBefore, '\n')
                 else

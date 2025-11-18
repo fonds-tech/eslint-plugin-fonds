@@ -78,6 +78,9 @@ export default createEslintRule<Options, MessageIds>({
   },
   defaultOptions: [{}],
   create: (context, [options = {}] = [{}]) => {
+    /**
+     * 默认允许单元素多行时闭合括号另起一行的节点集合
+     */
     const multilineNodes = new Set([
       'ArrayExpression',
       'FunctionDeclaration',
@@ -150,6 +153,7 @@ export default createEslintRule<Options, MessageIds>({
         ? undefined
         : context.sourceCode.getFirstToken(node)
       if (node.type === 'CallExpression') {
+        // 调用表达式需从泛型或被调用对象之后定位到左括号
         startToken = context.sourceCode.getTokenAfter(
           node.typeArguments
             ? node.typeArguments
@@ -223,6 +227,7 @@ export default createEslintRule<Options, MessageIds>({
             node.range[1],
           )
         : node.range[1]
+      // 取闭合括号或后续节点前的索引作为尾部参考位置
       const endLoc = context.sourceCode.getLocFromIndex(endRange)
 
       const lastItem = items[items.length - 1]!

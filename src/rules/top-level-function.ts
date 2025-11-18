@@ -77,7 +77,10 @@ export default createEslintRule<Options, MessageIds>({
             const textArgs = fnExpression.params.length
               ? code.slice(fnExpression.params[0].range[0], fnExpression.params[fnExpression.params.length - 1].range[1])
               : ''
-            // 若函数体为表达式，需要包裹成块并 return 出去
+            /**
+             * 若函数体为表达式（箭头函数），需转换为块并 `return` 该表达式，
+             * 以维持语义与可读性；函数/泛型/返回类型等保持原样拼接。
+             */
             const textBody = body.type === 'BlockStatement'
               ? code.slice(body.range[0], body.range[1])
               : `{\n  return ${code.slice(body.range[0], body.range[1])}\n}`

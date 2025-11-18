@@ -38,6 +38,10 @@ interface FixCandidate {
   }
 }
 
+/**
+ * 样式文件匹配：css、scss、sass、pcss、less
+ * `i` 不区分大小写；`[cps]c?ss` 兼容 scss/sass/pcss
+ */
 const CSS_FILE_REGEXP = /\.(?:[cps]c?ss|less)$/i
 
 export default createEslintRule<Options, MessageIds>({
@@ -129,6 +133,10 @@ function isCssLikeFile(filename: string): boolean {
  * 尝试使用 scss/less/标准 CSS 解析源码
  */
 function parseStyles(code: string): Root | null {
+  /**
+   * 按 scss → less → 标准 CSS 的优先级依次尝试解析
+   * 任何一个解析成功即返回其规范化后的 Root；失败则继续尝试下一个
+   */
   const parsers = [
     () => scssSyntax.parse(code, { from: undefined }),
     () => lessSyntax.parse(code, { from: undefined }),
@@ -179,6 +187,10 @@ function collectFixes(root: Root, code: string, orderMap: Map<string, number>): 
    * 深度遍历容器节点，遇到非声明节点时递归处理
    */
   const visit = (container: Container | Root): void => {
+    /**
+     * 深度优先遍历：聚合相邻的声明 `decl` 为一个组；
+     * 遇到其他节点先对当前组 `flushGroup`，再递归进入该子节点
+     */
     if (!('nodes' in container) || !container.nodes)
       return
 
@@ -211,6 +223,10 @@ function collectFixes(root: Root, code: string, orderMap: Map<string, number>): 
  * 根据同一个块内的声明生成排序结果
  */
 function buildFix(decls: Declaration[], code: string, orderMap: Map<string, number>): FixCandidate | null {
+  /**
+   * 将同一块中的声明收集为排序条目，计算自定义组序索引、长度分数与字母序 key，
+   * 若排序前后一致则返回 null；否则提供替换文本与首个不一致的提示信息
+   */
   const ranges: Array<[number, number]> = []
   const entries: SortEntry[] = []
 
@@ -271,6 +287,9 @@ function buildFix(decls: Declaration[], code: string, orderMap: Map<string, numb
 }
 
 function compareEntries(a: SortEntry, b: SortEntry): number {
+  /**
+   * 排序优先级：自定义分组序 → 属性名长度 → 字母序 → 稳定原始索引
+   */
   if (a.orderIndex !== b.orderIndex)
     return a.orderIndex - b.orderIndex
 
@@ -286,6 +305,9 @@ function compareEntries(a: SortEntry, b: SortEntry): number {
 }
 
 function getOrderIndex(prop: string, orderMap: Map<string, number>): number {
+  /**
+   * 将属性名按小写匹配到自定义顺序表，缺省返回最大数保证自然排序在其后
+   */
   const key = prop.toLowerCase()
   const index = orderMap.get(key)
   return index ?? Number.MAX_SAFE_INTEGER
@@ -296,6 +318,10 @@ function getOrderIndex(prop: string, orderMap: Map<string, number>): number {
  * @description 结尾会继续吃掉分号及其后的少量空白，便于整体替换
  */
 function getDeclarationRange(decl: Declaration, code: string): [number, number] | null {
+  /**
+   * 使用 PostCSS 的位置信息作为起止；
+   * 终点向后吞并一个分号与其后少量空白，便于整体替换保持格式
+   */
   const start = decl.source?.start?.offset
   let end = decl.source?.end?.offset
   if (start == null || end == null)
@@ -323,6 +349,9 @@ function getDeclarationRange(decl: Declaration, code: string): [number, number] 
  * 向前回溯，捕获第一个声明前的缩进/空白
  */
 function getGroupLeadingStart(code: string, start: number): number {
+  /**
+   * 从组首声明向前回溯，捕获前导空白/缩进作为首个声明的前缀
+   */
   let index = start
   while (index > 0) {
     const char = code[index - 1]

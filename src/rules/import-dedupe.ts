@@ -36,7 +36,10 @@ export default createEslintRule<Options, MessageIds>({
         node.specifiers.forEach((n) => {
           const id = n.local.name
           if (names.has(id)) {
-            // 命名重复时仅移除后出现的 specifier，保留首次声明
+            /**
+             * 去重策略：保留首次出现的本地标识符，移除后续重复项；
+             * 若存在拖尾逗号则一并删除，避免产生残留分隔符。
+             */
             context.report({
               node,
               loc: {

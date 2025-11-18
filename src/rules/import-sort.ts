@@ -549,6 +549,10 @@ function rebuildBlock(entries: ImportEntry[], eol: string): string {
 }
 
 function getImportLengthScore(node: TSESTree.ImportDeclaration, sourceCode: TSESLint.SourceCode): number {
+  /**
+   * 计算 import 声明长度分数
+   * 优先使用从 `import` 到源字符串前一个 token 的跨度，缺省时使用整段文本长度
+   */
   const importToken = sourceCode.getFirstToken(node)
   const tokenBeforeSource = sourceCode.getTokenBefore(node.source)
   if (importToken && tokenBeforeSource)
@@ -557,22 +561,35 @@ function getImportLengthScore(node: TSESTree.ImportDeclaration, sourceCode: TSES
 }
 
 function getImportAlphaKey(node: TSESTree.ImportDeclaration, sourceCode: TSESLint.SourceCode): string {
+  /**
+   * 获取用于字母序比较的 key
+   * 对字符串源直接取值，否则回退为源节点文本
+   */
   return typeof node.source.value === 'string'
     ? node.source.value
     : sourceCode.getText(node.source)
 }
 
 function getSpecifierLength(spec: TSESTree.ImportSpecifier, sourceCode: TSESLint.SourceCode): number {
+  /**
+   * 计算命名导入的紧凑长度（去除所有空白）
+   */
   return sourceCode.getText(spec).replace(/\s+/g, '').length
 }
 
 function getSpecifierName(spec: TSESTree.ImportSpecifier): string {
+  /**
+   * 取得命名导入的标识符名称（支持字符串字面量导入）
+   */
   if (spec.imported.type === 'Identifier')
     return spec.imported.name
   return String(spec.imported.value)
 }
 
 function compareStrings(a: string, b: string, caseSensitive: boolean): number {
+  /**
+   * 字符串比较辅助：可配置是否大小写敏感
+   */
   const left = caseSensitive ? a : a.toLowerCase()
   const right = caseSensitive ? b : b.toLowerCase()
   if (left < right)
@@ -594,6 +611,9 @@ function normalizeSortOption(option?: SortOption): NormalizedSortOption {
 }
 
 function isSideEffectImport(node: TSESTree.ImportDeclaration): boolean {
+  /**
+   * 判断是否为仅含副作用的导入（无任何 specifier）
+   */
   return node.specifiers.length === 0
 }
 
@@ -668,10 +688,16 @@ function getCategoryPriority(category: ImportCategory): number {
 }
 
 function areSameOrder(a: ImportEntry[], b: ImportEntry[]): boolean {
+  /**
+   * 检查两序列是否完全同序（引用级别比较）
+   */
   return a.length === b.length && a.every((entry, index) => entry === b[index])
 }
 
 function findFirstDifferenceIndex(original: ImportEntry[], sorted: ImportEntry[]): number {
+  /**
+   * 找到原序列与排序结果的首个差异索引，若无则返回 -1
+   */
   for (let i = 0; i < original.length; i += 1) {
     if (original[i] !== sorted[i])
       return i
@@ -680,12 +706,18 @@ function findFirstDifferenceIndex(original: ImportEntry[], sorted: ImportEntry[]
 }
 
 function getImportSourceValue(node: TSESTree.ImportDeclaration, sourceCode: TSESLint.SourceCode): string {
+  /**
+   * 统一获取 import 源的字符串表示
+   */
   if (typeof node.source.value === 'string')
     return node.source.value
   return sourceCode.getText(node.source)
 }
 
 function getImportPathLabel(entry: ImportEntry): string {
+  /**
+   * 格式化路径类别标签，类型导入会加上 `-type` 后缀
+   */
   const label = entry.pathCategory === 'side-effect' ? 'side-effect' : entry.pathCategory
   return entry.isTypeOnly && entry.pathCategory !== 'side-effect'
     ? `${label}-type`

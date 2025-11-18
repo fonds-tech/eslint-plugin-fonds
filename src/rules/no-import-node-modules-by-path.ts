@@ -28,7 +28,10 @@ export default createEslintRule<Options, MessageIds>({
   create: (context) => {
     return {
       'ImportDeclaration': (node) => {
-        // 直接在 import 源头字面值中匹配 node_modules 片段
+        /**
+         * 禁止形如 `import '../node_modules/pkg'` 的导入；
+         * 通过检测源字符串是否包含 `/node_modules/` 来判定。
+         */
         if (node.source.value.includes('/node_modules/')) {
           context.report({
             node,
@@ -38,7 +41,9 @@ export default createEslintRule<Options, MessageIds>({
       },
       'CallExpression[callee.name="require"]': (node: any) => {
         const value = node.arguments[0]?.value
-        // CommonJS `require('path/to/node_modules/pkg')` 同样禁止
+        /**
+         * CommonJS 形式同样禁止：`require('.../node_modules/...')`
+         */
         if (typeof value === 'string' && value.includes('/node_modules/')) {
           context.report({
             node,

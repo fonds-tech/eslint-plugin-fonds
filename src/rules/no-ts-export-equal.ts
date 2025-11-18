@@ -29,7 +29,10 @@ export default createEslintRule<Options, MessageIds>({
     const extension = context.getFilename().split('.').pop()
     if (!extension)
       return {}
-    // 仅在 TypeScript 相关文件启用该规则，JS 文件不做检查
+    /**
+     * 仅在 TypeScript 相关文件启用该规则：ts/tsx/mts/cts；
+     * JS 文件或其他扩展名不做检查，避免误报。
+     */
     if (!['ts', 'tsx', 'mts', 'cts'].includes(extension))
       return {}
 

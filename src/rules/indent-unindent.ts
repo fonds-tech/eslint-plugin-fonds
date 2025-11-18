@@ -71,7 +71,10 @@ export default createEslintRule<Options, MessageIds>({
         })
         const baseIndent = context.sourceCode.text.slice(lineStartIndex).match(/^\s*/)?.[0] ?? ''
         const targetIndent = baseIndent + ' '.repeat(indent)
-        // 使用 `unindent` 去除模板内部已有缩进后，逐行补上目标缩进
+        /**
+         * 先使用 `unindent` 去除模板内部固有缩进；
+         * 再按行追加目标缩进，首尾补换行并保留外层基准缩进，确保整体风格统一。
+         */
         const pure = unindent([value] as any)
         let final = pure
           .split('\n')

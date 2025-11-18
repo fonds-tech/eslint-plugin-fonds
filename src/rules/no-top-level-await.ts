@@ -29,6 +29,10 @@ export default createEslintRule<Options, MessageIds>({
   create: (context) => {
     return {
       AwaitExpression: (node) => {
+        /**
+         * 通过沿父级节点向上查找，若命中任意函数容器则视为合法 await；
+         * 否则认为位于模块顶层并报告。
+         */
         let parent: TSESTree.Node | undefined = node.parent
         // 若沿父级遍历遇到任意函数作用域，则说明 await 不在顶层
         while (parent) {

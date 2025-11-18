@@ -43,6 +43,10 @@ export default createEslintRule<Options, MessageIds>({
             },
             messageId: 'missingIfNewline',
             fix(fixer) {
+              /**
+               * 在执行语句起始位置插入一个换行；
+               * 不改变原有缩进，由开发者或其他格式化规则处理缩进。
+               */
               return fixer.replaceTextRange([node.consequent.range[0], node.consequent.range[0]], '\n')
             },
           })
