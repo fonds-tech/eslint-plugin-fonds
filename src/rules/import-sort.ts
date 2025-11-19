@@ -769,12 +769,13 @@ function getPathPriority(category: ImportPathCategory): number {
 
 /**
  * type/默认/namespace 等 import 类型的优先级
+ * @description 默认导入需位于仅具名导入之前，确保 `import Foo from` 比 `import { Foo } from` 更靠前
  */
 function getCategoryPriority(category: ImportCategory): number {
   switch (category) {
-    case 'named':
-      return 0
     case 'default':
+      return 0
+    case 'named':
       return 1
     case 'namespace':
       return 2

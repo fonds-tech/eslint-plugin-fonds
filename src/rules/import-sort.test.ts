@@ -36,8 +36,8 @@ const valids: ValidTestCase[] = [
   },
   {
     code: $`
-      import { a } from 'a'
       import defaultExport from 'very-long-module'
+      import { a } from 'a'
       
       export function run() {
         return defaultExport(a)
@@ -119,8 +119,8 @@ const invalid: InvalidTestCase[] = [
       import { bar } from './bar'
     `,
     output: output => expect(output).toMatchInlineSnapshot(`
-      "import { bar } from './bar'
-      import foo from './foo'
+      "import foo from './foo'
+      import { bar } from './bar'
       import * as api from './api'"
     `),
   },
@@ -180,13 +180,13 @@ const invalid: InvalidTestCase[] = [
       },
     ],
     output: output => expect(output).toMatchInlineSnapshot(`
-      "import {
+      "import a from 'foo/a'
+      import Z from 'foo/Z'
+      import {
         b,
         zebra,
         alpha,
       } from 'foo/list'
-      import a from 'foo/a'
-      import Z from 'foo/Z'
       import './style.css'
 
       export function useList() {
@@ -231,11 +231,11 @@ const invalid: InvalidTestCase[] = [
       "import './polyfill'
       // keep style order
       import './style.css'
+      // util helpers
+      import helperUtility from 'helper-utils'
 
       import { bb } from 'bb-module'
       import { alpha, componentLongName } from 'module-components'
-      // util helpers
-      import helperUtility from 'helper-utils'
 
       console.log(helperUtility, alpha)
 
@@ -302,10 +302,10 @@ const invalid: InvalidTestCase[] = [
       },
     ],
     output: output => expect(output).toMatchInlineSnapshot(`
-      "import { a } from 'a'
-      import { beta } from 'beta-module'
-      import short from 'x'
+      "import short from 'x'
       import defaultLong from 'long-module-path'
+      import { a } from 'a'
+      import { beta } from 'beta-module'
 
       console.log(defaultLong, short)"
     `),
@@ -316,8 +316,8 @@ const invalid: InvalidTestCase[] = [
       import baz from './baz'
     `,
     output: output => expect(output).toMatchInlineSnapshot(`
-      "import { Bar, type Foo } from './types'
-      import baz from './baz'"
+      "import baz from './baz'
+      import { Bar, type Foo } from './types'"
     `),
   },
   {
@@ -397,8 +397,8 @@ const invalid: InvalidTestCase[] = [
     output: output => expect(output).toMatchInlineSnapshot(`
       "import type { Foo } from './types'
       import type { Bar } from './types/bar'
-      import { bar } from './bar'
-      import baz from './baz'"
+      import baz from './baz'
+      import { bar } from './bar'"
     `),
   },
   // 组合：typeImportHandling 为 ignore 时，类型导入需要自动提前
@@ -432,8 +432,8 @@ const invalid: InvalidTestCase[] = [
       },
     ],
     output: output => expect(output).toMatchInlineSnapshot(`
-      "import { foo } from './foo'
-      import beta from './beta'
+      "import beta from './beta'
+      import { foo } from './foo'
       import './polyfill'
       import type { Zeta } from './types'
       import type { Alpha } from './alpha'"

@@ -7,7 +7,7 @@
 - 仅读取文件顶部的连续 import 语句，遇到第一个非 import 语句即停止；
 - 默认忽略副作用 import（如 `import './polyfill'`），可通过配置让其参与排序；
 - 外层 import 会按 `长度 → 字母（可选）→ 原顺序` 排列，命名导入亦遵循相同策略；
-- `default` 与 `namespace` 导入保持原始位置，仅重排 `{ ... }` 中的命名导入；
+- 在长度/字母比较前会先比较路径类别与导入类别，导入类别默认遵循 `default` → `named` → `namespace` 的优先顺序，确保默认导入位于具名导入之上；
 - 所有行为均可通过 `outer`、`inner`、`ignoreSideEffectImports` 配置启停。
 - 在长度/字母比较之前，会先依据模块来源类别排序：`builtin (node:xxx)` → `absolute` → `parent (../)` → `sibling (./)` → `index` → `external` → `side-effect`。
 
@@ -56,6 +56,7 @@ type Options = [{
 ```ts
 /* eslint-disable perfectionist/sort-imports, perfectionist/sort-named-imports */
 import { foo } from 'ab'
+import defaultExport from 'very-long-module'
 import {
   gamma,
   alpha,
@@ -72,6 +73,7 @@ import {
   alpha,
   gamma,
 } from 'module-two'
+import defaultExport from 'very-long-module'
 ```
 
 ### 只排序命名导入
