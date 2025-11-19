@@ -479,6 +479,114 @@ const invalid: InvalidTestCase[] = [
       import type { OptionsFiles, OptionsOverrides, TypedFlatConfigItem, OptionsComponentExts } from '../types'"
     `),
   },
+  {
+    code: $`
+      import {
+        b, // comment b
+        a,
+      } from 'mod'
+      import { x } from '..'
+      import { y } from '../parent'
+    `,
+    output: output => expect(output).toMatchInlineSnapshot(`
+      "import { x } from '..'
+      import { y } from '../parent'
+      import {
+        a,
+        b, // comment b
+      } from 'mod'"
+    `),
+  },
+  // 1. Complex Comments: Block comments and interleaved comments
+  {
+    code: $`
+      import {
+        /* start */ b,
+        a /* end */
+      } from 'mod'
+      import {
+        d, // trailing d
+        c
+      } from 'mod2'
+    `,
+    output: output => expect(output).toMatchInlineSnapshot(`
+      "import {
+        c,
+        d // trailing d
+      } from 'mod2'
+      import {
+        a /* end */,
+        /* start */ b
+      } from 'mod'"
+    `),
+  },
+  // 2. Mixed & Type Imports: Inline types, default + named
+  {
+    code: $`
+      import { type T, v } from 'mod'
+      import D, { type U, x } from 'mod2'
+    `,
+    output: output => expect(output).toMatchInlineSnapshot(`
+      "import { v, type T } from 'mod'
+      import D, { x, type U } from 'mod2'"
+    `),
+  },
+  // 3. Advanced Path Groups: Multiple custom patterns
+  {
+    code: $`
+      import { ui } from '@ui/components'
+      import { utils } from '@utils/helpers'
+      import { api } from '@server/api'
+      import { ext } from 'external-lib'
+    `,
+    options: [
+      {
+        pathGroups: [
+          { pattern: '^@ui/', group: 'external' },
+          { pattern: '^@utils/', group: 'parent' },
+          { pattern: '^@server/', group: 'sibling' },
+        ],
+      },
+    ],
+    output: output => expect(output).toMatchInlineSnapshot(`
+      "import { utils } from '@utils/helpers'
+      import { api } from '@server/api'
+      import { ui } from '@ui/components'
+      import { ext } from 'external-lib'"
+    `),
+  },
+  // 4. Case Sensitivity: Mixed case sorting
+  {
+    code: $`
+      import { B, a, c } from 'mod'
+      import { D, e, F } from 'mod2'
+    `,
+    options: [
+      {
+        inner: { caseSensitive: false },
+      },
+    ],
+    output: output => expect(output).toMatchInlineSnapshot(`
+      "import { a, B, c } from 'mod'
+      import { D, e, F } from 'mod2'"
+    `),
+  },
+  // 5. Side Effects: Interleaved side-effect imports
+  {
+    code: $`
+      import 'side-effect-a'
+      import { b } from 'b'
+      import 'side-effect-c'
+      import { a } from 'a'
+    `,
+    options: [{ ignoreSideEffectImports: false }],
+    output: output => expect(output).toMatchInlineSnapshot(`
+      "import { a } from 'a'
+      import { b } from 'b'
+      import 'side-effect-a'
+      import 'side-effect-c'"
+    `),
+  },
 ]
 
 run({

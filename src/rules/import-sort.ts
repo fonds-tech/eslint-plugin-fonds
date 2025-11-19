@@ -534,7 +534,7 @@ function buildSpecifierBlock(
   sorted: TSESTree.ImportSpecifier[],
   sourceCode: TSESLint.SourceCode,
 ): string {
-  const specTexts = sorted.map(spec => sourceCode.getText(spec).trim())
+  const specTexts = sorted.map(spec => getSpecifierTextWithComments(spec, sourceCode))
   if (specTexts.length === 0)
     return existingInner
 
@@ -554,12 +554,66 @@ function buildSpecifierBlock(
   const indent = indentMatch ? indentMatch[1] : '  '
   const closingIndentMatch = existingInner.match(/\n([ \t]*)$/)
   const closingIndent = closingIndentMatch ? closingIndentMatch[1] : ''
-  const lines = specTexts.map(text => `${indent}${text}`).join(`,${eol}`)
-  let inner = `${eol}${lines}`
-  if (hasTrailingComma)
-    inner += ','
-  inner += `${eol}${closingIndent}`
-  return inner
+
+  const lines = specTexts.map((text, index) => {
+    const isLast = index === specTexts.length - 1
+    const shouldAddComma = !isLast || hasTrailingComma
+
+    let content = text
+    if (shouldAddComma) {
+      const commentMatch = text.match(/(\s*\/\/.*)$/)
+      if (commentMatch) {
+        const code = text.slice(0, commentMatch.index)
+        const comment = commentMatch[0]
+        content = `${code},${comment}`
+      }
+      else {
+        content = `${text},`
+      }
+    }
+    return `${indent}${content}`
+  }).join(eol)
+
+  return `${eol}${lines}${eol}${closingIndent}`
+}
+
+function getSpecifierTextWithComments(spec: TSESTree.ImportSpecifier, sourceCode: TSESLint.SourceCode): string {
+  const beforeComments = sourceCode.getCommentsBefore(spec).filter(c => !isTrailingComment(c, sourceCode))
+  const afterComments = sourceCode.getCommentsAfter(spec)
+  const extraTrailing = findTrailingComment(spec, sourceCode)
+  if (extraTrailing && !afterComments.includes(extraTrailing))
+    afterComments.push(extraTrailing)
+
+  const specText = sourceCode.getText(spec)
+
+  const before = beforeComments.map(c => sourceCode.getText(c)).join(' ')
+  const after = afterComments.map(c => sourceCode.getText(c)).join(' ')
+
+  return `${before ? `${before} ` : ''}${specText}${after ? ` ${after}` : ''}`
+}
+
+function isTrailingComment(comment: TSESTree.Comment, sourceCode: TSESLint.SourceCode): boolean {
+  const line = sourceCode.lines[comment.loc.start.line - 1]
+  const prefix = line.slice(0, comment.loc.start.column)
+  return prefix.trim().length > 0
+}
+
+function findTrailingComment(spec: TSESTree.ImportSpecifier, sourceCode: TSESLint.SourceCode): TSESTree.Comment | null {
+  const nextToken = sourceCode.getTokenAfter(spec)
+  const isComma = nextToken && nextToken.value === ',' && nextToken.type === 'Punctuator'
+
+  const tokenToCheck = isComma
+    ? sourceCode.getTokenAfter(nextToken, { includeComments: true })
+    : sourceCode.getTokenAfter(spec, { includeComments: true })
+
+  if (
+    tokenToCheck
+    && (tokenToCheck.type === 'Line' || tokenToCheck.type === 'Block')
+    && tokenToCheck.loc.start.line === spec.loc.end.line
+  ) {
+    return tokenToCheck as TSESTree.Comment
+  }
+  return null
 }
 
 /**
@@ -794,7 +848,7 @@ function classifyPathCategory(
   if (value === '.' || value === './')
     return 'index'
 
-  if (value.startsWith('../'))
+  if (value.startsWith('../') || value === '..')
     return 'parent'
 
   if (value.startsWith('./'))
