@@ -327,18 +327,26 @@ function getDeclarationRange(decl: Declaration, code: string): [number, number] 
   if (start == null || end == null)
     return null
 
+  let hasTerminator = code.slice(start, end).includes(';')
   while (end < code.length) {
     const char = code[end]
     if (char === ';') {
       end += 1
-      break
+      hasTerminator = true
+      continue
     }
     if (char === '\n' || char === '\r')
       break
-    if (!/\s/.test(char)) {
+    if (char === ' ' || char === '\t') {
       end += 1
       continue
     }
+    if (char === '}')
+      break
+    // 遇到分号后的首个非空白字符（通常是下一条声明或右花括号）即停止，避免跨越到下一个声明
+    if (hasTerminator)
+      break
+
     end += 1
   }
 

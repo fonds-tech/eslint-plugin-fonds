@@ -1,6 +1,7 @@
 .cache
 .DS_Store
 .idea
+.serena
 *.log
 *.tgz
 coverage
@@ -9,3 +10,5 @@ lib-cov
 logs
 node_modules
 temp
+openspec
+AGENTS.md
