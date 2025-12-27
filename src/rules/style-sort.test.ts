@@ -80,6 +80,36 @@ const valids: ValidTestCase[] = [
       parser: cssParser,
     },
   },
+  // CSS 变量已正确排序在最前面
+  {
+    filename: 'variables.css',
+    code: $`
+      .card {
+        --ds-bg: #f8f9fb;
+        --ds-sub: #4b5563;
+        --ds-card: #ffffff;
+        width: 100%;
+        display: flex;
+      }
+    `,
+    languageOptions: {
+      parser: cssParser,
+    },
+  },
+  // CSS 变量在 :root 中已正确排序
+  {
+    filename: 'theme.css',
+    code: $`
+      :root {
+        --gap: 8px;
+        --space: 16px;
+        --padding: 24px;
+      }
+    `,
+    languageOptions: {
+      parser: cssParser,
+    },
+  },
 ]
 
 const invalid: InvalidTestCase[] = [
@@ -201,6 +231,84 @@ const invalid: InvalidTestCase[] = [
       :root {
         --gap: 8px;
         --space: 16px;
+      }"
+    `),
+  },
+  // CSS 变量应排在普通属性之前
+  {
+    filename: 'variables.css',
+    code: $`
+      .card {
+        width: 100%;
+        --ds-bg: #f8f9fb;
+        display: flex;
+        --ds-sub: #4b5563;
+        --ds-card: #ffffff;
+      }
+    `,
+    languageOptions: {
+      parser: cssParser,
+    },
+    output: output => expect(output).toMatchInlineSnapshot(`
+      ".card {
+        --ds-bg: #f8f9fb;
+        --ds-sub: #4b5563;
+        --ds-card: #ffffff;
+        width: 100%;
+        display: flex;
+      }"
+    `),
+  },
+  // CSS 变量与 groupedProperties 混合排序
+  {
+    filename: 'mixed.scss',
+    code: $`
+      .panel {
+        color: red;
+        --theme-primary: #007bff;
+        width: 200px;
+        --theme-secondary: #6c757d;
+        height: 100px;
+      }
+    `,
+    options: [
+      {
+        groupedProperties: ['width', 'height', 'color'],
+      },
+    ],
+    languageOptions: {
+      parser: cssParser,
+    },
+    output: output => expect(output).toMatchInlineSnapshot(`
+      ".panel {
+        width: 200px;
+        height: 100px;
+        color: red;
+        --theme-primary: #007bff;
+        --theme-secondary: #6c757d;
+      }"
+    `),
+  },
+  // 纯 CSS 变量块排序（按长度和字母序）
+  {
+    filename: 'vars-only.css',
+    code: $`
+      :root {
+        --primary-color: blue;
+        --gap: 8px;
+        --bg: #fff;
+        --spacing: 16px;
+      }
+    `,
+    languageOptions: {
+      parser: cssParser,
+    },
+    output: output => expect(output).toMatchInlineSnapshot(`
+      ":root {
+        --bg: #fff;
+        --gap: 8px;
+        --spacing: 16px;
+        --primary-color: blue;
       }"
     `),
   },

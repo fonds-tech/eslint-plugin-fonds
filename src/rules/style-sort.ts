@@ -288,10 +288,17 @@ function buildFix(decls: Declaration[], code: string, orderMap: Map<string, numb
 
 function compareEntries(a: SortEntry, b: SortEntry): number {
   /**
-   * 排序优先级：自定义分组序 → 属性名长度 → 字母序 → 稳定原始索引
+   * 排序优先级：自定义分组序 → CSS变量优先 → 属性名长度 → 字母序 → 稳定原始索引
+   * CSS 变量（以 -- 开头）始终排在普通属性之前
    */
   if (a.orderIndex !== b.orderIndex)
     return a.orderIndex - b.orderIndex
+
+  // CSS 变量优先：-- 开头的属性排在最前面
+  const aIsVar = a.prop.startsWith('--')
+  const bIsVar = b.prop.startsWith('--')
+  if (aIsVar !== bIsVar)
+    return aIsVar ? -1 : 1
 
   const lengthDiff = a.lengthScore - b.lengthScore
   if (lengthDiff !== 0)
