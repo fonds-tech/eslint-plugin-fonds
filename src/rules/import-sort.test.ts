@@ -82,9 +82,54 @@ const valids: ValidTestCase[] = [
       },
     ],
   },
+  // 组合：typeImportHandling 为 ignore 时，默认导入仍应在类型命名导入之前
+  {
+    code: $`
+      import fs from 'node:fs'
+      import type { EnvConfig } from './types'
+    `,
+    options: [
+      {
+        typeImportHandling: 'ignore',
+      },
+    ],
+  },
+  // 组合：跨路径类别时，默认导入（builtin + external）应排在命名导入之前
+  {
+    code: $`
+      import process from 'node:process'
+      import chokidar from 'chokidar'
+      import { readFileSync } from 'node:fs'
+      import { join, extname, resolve } from 'node:path'
+      import { parse as jsonParse } from 'jsonc-parser'
+      import { createFilter, normalizePath } from 'vite'
+      import { MagicString, parse as vueParse } from '@vue/compiler-sfc'
+    `,
+  },
 ]
 
 const invalid: InvalidTestCase[] = [
+  // 组合：跨路径类别时，命名导入在默认导入之前需要被修复
+  {
+    code: $`
+      import process from 'node:process'
+      import { readFileSync } from 'node:fs'
+      import { join, extname, resolve } from 'node:path'
+      import chokidar from 'chokidar'
+      import { parse as jsonParse } from 'jsonc-parser'
+      import { createFilter, normalizePath } from 'vite'
+      import { MagicString, parse as vueParse } from '@vue/compiler-sfc'
+    `,
+    output: output => expect(output).toMatchInlineSnapshot(`
+      "import process from 'node:process'
+      import chokidar from 'chokidar'
+      import { readFileSync } from 'node:fs'
+      import { join, extname, resolve } from 'node:path'
+      import { parse as jsonParse } from 'jsonc-parser'
+      import { createFilter, normalizePath } from 'vite'
+      import { MagicString, parse as vueParse } from '@vue/compiler-sfc'"
+    `),
+  },
   {
     code: $`
       import { foo } from 'ab'
@@ -362,9 +407,9 @@ const invalid: InvalidTestCase[] = [
       },
     ],
     output: output => expect(output).toMatchInlineSnapshot(`
-      "import { coreUtil } from '@core/utils'
-      import { Button } from '~/components/button'
-      import axios from 'axios'"
+      "import axios from 'axios'
+      import { coreUtil } from '@core/utils'
+      import { Button } from '~/components/button'"
     `),
   },
   {
@@ -401,22 +446,7 @@ const invalid: InvalidTestCase[] = [
       import { bar } from './bar'"
     `),
   },
-  // 组合：typeImportHandling 为 ignore 时，类型导入需要自动提前
-  {
-    code: $`
-      import fs from 'node:fs'
-      import type { EnvConfig } from './types'
-    `,
-    options: [
-      {
-        typeImportHandling: 'ignore',
-      },
-    ],
-    output: output => expect(output).toMatchInlineSnapshot(`
-      "import type { EnvConfig } from './types'
-      import fs from 'node:fs'"
-    `),
-  },
+
   {
     code: $`
       import type { Zeta } from './types'

@@ -414,6 +414,12 @@ function compareSegmentEntries(
   if (typePriority !== 0)
     return typePriority
 
+  // 优先按 category 排序（default > named > namespace > side-effect）
+  // 使得所有默认导入都排在命名导入之前
+  const categoryPriority = getCategoryPriority(a.category) - getCategoryPriority(b.category)
+  if (categoryPriority !== 0)
+    return categoryPriority
+
   const shouldComparePath = enablePathSorting
     || isSpecialPathCategory(a.pathCategory)
     || isSpecialPathCategory(b.pathCategory)
@@ -432,10 +438,6 @@ function compareSegmentEntries(
     if (pathPriority !== 0)
       return pathPriority
   }
-
-  const categoryPriority = getCategoryPriority(a.category) - getCategoryPriority(b.category)
-  if (categoryPriority !== 0)
-    return categoryPriority
 
   return compareEntries(a, b, config)
 }
